@@ -1,6 +1,7 @@
 [gd_scene load_steps=25 format=3 uid="uid://lands_of_balance"]
 
 [ext_resource type="Script" uid="uid://vw47tquoshc7" path="res://stage/stage.gd" id="1_stage"]
+[ext_resource type="Script" path="res://stage/village_decorator.gd" id="2_decorator"]
 [ext_resource type="Shader" uid="uid://bromrf0kc05o8" path="res://stage/skybox.gdshader" id="2_skybox"]
 [ext_resource type="CompressedCubemap" uid="uid://bnqdokul6s4pt" path="res://stage/skybox.webp" id="3_skybox_tex"]
 
@@ -859,3 +860,6 @@ material = SubResource("mat_tree_trunk")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, 0)
 radius = 4.5
 material = SubResource("mat_tree_leaves")
+
+[node name="VillageDecorator" type="Node3D" parent="."]
+script = ExtResource("2_decorator")

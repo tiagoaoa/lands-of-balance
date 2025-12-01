@@ -17,16 +17,23 @@ const CAMERA_VERTICAL_LIMIT: float = 85.0  # degrees
 enum CombatMode { UNARMED, ARMED }
 
 # Character model paths
-const UNARMED_CHARACTER_PATH: String = "res://player/character/Idle.fbx"
+const UNARMED_CHARACTER_PATH: String = "res://player/character/unarmed/Paladin.fbx"
 const ARMED_CHARACTER_PATH: String = "res://player/character/armed/Paladin.fbx"
 
-# Unarmed animations (Y Bot)
+# Unarmed animations (Paladin without weapons)
 const UNARMED_ANIM_PATHS: Dictionary = {
-	"idle": "res://player/character/Idle.fbx",
-	"walk": "res://player/character/Walking.fbx",
-	"strafe_left": "res://player/character/Walk Strafe Left.fbx",
-	"jump": "res://player/character/Unarmed Jump.fbx",
-	"kick": "res://player/character/Roundhouse Kick.fbx",
+	"idle": "res://player/character/unarmed/Idle.fbx",
+	"walk": "res://player/character/unarmed/Walk.fbx",
+	"run": "res://player/character/unarmed/Run.fbx",
+	"strafe_left": "res://player/character/unarmed/StrafeLeft.fbx",
+	"strafe_right": "res://player/character/unarmed/StrafeRight.fbx",
+	"jump": "res://player/character/unarmed/Jump.fbx",
+	"turn_left": "res://player/character/unarmed/TurnLeft.fbx",
+	"turn_right": "res://player/character/unarmed/TurnRight.fbx",
+	"attack": "res://player/character/unarmed/Attack.fbx",
+	"block": "res://player/character/unarmed/Block.fbx",
+	"action_to_idle": "res://player/character/unarmed/ActionIdleToIdle.fbx",
+	"idle_to_fight": "res://player/character/unarmed/IdleToFight.fbx",
 }
 
 # Armed animations (Paladin with sword & shield)
@@ -58,6 +65,7 @@ var combat_mode: CombatMode = CombatMode.UNARMED
 var is_attacking: bool = false
 var is_blocking: bool = false
 var is_sheathing: bool = false
+var is_transitioning: bool = false  # For attack/idle transitions
 var attack_combo: int = 0
 var _attack_cooldown: float = 0.0
 
@@ -80,12 +88,21 @@ func _create_characters() -> void:
 	_character_model.name = "CharacterModel"
 	add_child(_character_model)
 
-	# Load unarmed character (Y Bot)
+	# Load unarmed character (Paladin without weapons)
 	_unarmed_character = _load_character(UNARMED_CHARACTER_PATH, "UnarmedCharacter", Color(0.35, 0.55, 0.75))
 	if _unarmed_character:
 		_character_model.add_child(_unarmed_character)
 		_unarmed_anim_player = _find_animation_player(_unarmed_character)
+		print("Unarmed AnimationPlayer found: ", _unarmed_anim_player != null)
 		if _unarmed_anim_player:
+			_unarmed_anim_player.animation_finished.connect(_on_animation_finished)
+			_load_animations_for_character(_unarmed_anim_player, UNARMED_ANIM_PATHS, _get_unarmed_config(), "unarmed", _unarmed_character)
+		else:
+			# Create AnimationPlayer if not found
+			print("Creating AnimationPlayer for unarmed character")
+			_unarmed_anim_player = AnimationPlayer.new()
+			_unarmed_anim_player.name = "AnimationPlayer"
+			_unarmed_character.add_child(_unarmed_anim_player)
 			_unarmed_anim_player.animation_finished.connect(_on_animation_finished)
 			_load_animations_for_character(_unarmed_anim_player, UNARMED_ANIM_PATHS, _get_unarmed_config(), "unarmed", _unarmed_character)
 
@@ -114,9 +131,16 @@ func _get_unarmed_config() -> Dictionary:
 	return {
 		"idle": ["Idle", true],
 		"walk": ["Walk", true],
+		"run": ["Run", true],
 		"strafe_left": ["StrafeLeft", true],
+		"strafe_right": ["StrafeRight", true],
 		"jump": ["Jump", false],
-		"kick": ["Kick", false],
+		"turn_left": ["TurnLeft", false],
+		"turn_right": ["TurnRight", false],
+		"attack": ["Attack", false],
+		"block": ["Block", true],
+		"action_to_idle": ["ActionToIdle", false],
+		"idle_to_fight": ["IdleToFight", false],
 	}
 
 
@@ -321,6 +345,15 @@ func _on_animation_finished(anim_name: StringName) -> void:
 	if is_attacking:
 		is_attacking = false
 		_attack_cooldown = 0.2
+		# Play transition from attack to idle (unarmed mode only)
+		if combat_mode == CombatMode.UNARMED and _current_anim_player.has_animation(&"unarmed/ActionToIdle"):
+			is_transitioning = true
+			_current_anim_player.play(&"unarmed/ActionToIdle")
+			_current_anim = &"unarmed/ActionToIdle"
+	if is_transitioning:
+		# Transition animation finished
+		if anim_name == &"unarmed/ActionToIdle" or anim_name == &"unarmed/IdleToFight":
+			is_transitioning = false
 	if is_sheathing:
 		is_sheathing = false
 
@@ -343,7 +376,7 @@ func _update_animation(input_dir: Vector2) -> void:
 	if _current_anim_player == null:
 		return
 
-	if is_attacking or is_sheathing:
+	if is_attacking or is_sheathing or is_transitioning:
 		return
 
 	var prefix: String = _get_current_mode_prefix()
@@ -358,20 +391,27 @@ func _update_animation(input_dir: Vector2) -> void:
 		if desired_anim == &"":
 			return
 
-	# Blocking (armed mode only)
-	elif is_blocking and combat_mode == CombatMode.ARMED:
-		if _current_anim_player.has_animation(&"armed/Block"):
-			desired_anim = &"armed/Block"
+	# Blocking (both modes - shield in armed, center block in unarmed)
+	elif is_blocking:
+		var block_anim: StringName = StringName(prefix + "/Block")
+		if _current_anim_player.has_animation(block_anim):
+			desired_anim = block_anim
 
 	# Strafe
 	elif abs(input_dir.x) > 0.5 and abs(input_dir.y) < 0.3:
-		var strafe_anim: StringName = StringName(prefix + "/StrafeLeft")
+		var strafe_dir: String = "StrafeLeft" if input_dir.x < 0 else "StrafeRight"
+		var strafe_anim: StringName = StringName(prefix + "/" + strafe_dir)
 		if _current_anim_player.has_animation(strafe_anim):
 			desired_anim = strafe_anim
 		else:
-			var walk_anim: StringName = StringName(prefix + "/Walk")
-			if _current_anim_player.has_animation(walk_anim):
-				desired_anim = walk_anim
+			# Fallback to left strafe or walk
+			var fallback_strafe: StringName = StringName(prefix + "/StrafeLeft")
+			if _current_anim_player.has_animation(fallback_strafe):
+				desired_anim = fallback_strafe
+			else:
+				var walk_anim: StringName = StringName(prefix + "/Walk")
+				if _current_anim_player.has_animation(walk_anim):
+					desired_anim = walk_anim
 
 	# Running
 	elif is_running and input_dir.length() > 0.1:
@@ -430,7 +470,7 @@ func _toggle_combat_mode() -> void:
 			_unarmed_anim_player.play(&"unarmed/Idle")
 			_current_anim = &"unarmed/Idle"
 
-		print("Switched to UNARMED mode (Y Bot)")
+		print("Switched to UNARMED mode (Paladin)")
 
 
 func _do_attack() -> void:
@@ -448,9 +488,15 @@ func _do_attack() -> void:
 		else:
 			is_attacking = false
 	else:
-		if _current_anim_player.has_animation(&"unarmed/Kick"):
-			_current_anim_player.play(&"unarmed/Kick")
-			_current_anim = &"unarmed/Kick"
+		# Unarmed boxing attack - play transition first if coming from idle
+		if _current_anim == &"unarmed/Idle" and _current_anim_player.has_animation(&"unarmed/IdleToFight"):
+			# Play idle to fight transition, then queue attack
+			_current_anim_player.play(&"unarmed/IdleToFight")
+			_current_anim_player.queue(&"unarmed/Attack")
+			_current_anim = &"unarmed/IdleToFight"
+		elif _current_anim_player.has_animation(&"unarmed/Attack"):
+			_current_anim_player.play(&"unarmed/Attack")
+			_current_anim = &"unarmed/Attack"
 		else:
 			is_attacking = false
 
