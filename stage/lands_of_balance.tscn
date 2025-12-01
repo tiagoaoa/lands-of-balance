@@ -1,0 +1,861 @@
+[gd_scene load_steps=25 format=3 uid="uid://lands_of_balance"]
+
+[ext_resource type="Script" uid="uid://vw47tquoshc7" path="res://stage/stage.gd" id="1_stage"]
+[ext_resource type="Shader" uid="uid://bromrf0kc05o8" path="res://stage/skybox.gdshader" id="2_skybox"]
+[ext_resource type="CompressedCubemap" uid="uid://bnqdokul6s4pt" path="res://stage/skybox.webp" id="3_skybox_tex"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("2_skybox")
+shader_parameter/source_panorama = ExtResource("3_skybox_tex")
+shader_parameter/exposure = 1.0
+
+[sub_resource type="Sky" id="Sky_balance"]
+sky_material = SubResource("ShaderMaterial_sky")
+
+[sub_resource type="Environment" id="Environment_balance"]
+background_mode = 2
+sky = SubResource("Sky_balance")
+ambient_light_source = 2
+ambient_light_color = Color(0.7, 0.75, 0.8, 1)
+ambient_light_sky_contribution = 0.3
+tonemap_mode = 4
+fog_enabled = true
+fog_light_color = Color(0.75, 0.82, 0.9, 1)
+fog_density = 0.001
+fog_sky_affect = 0.4
+
+[sub_resource type="StandardMaterial3D" id="mat_grass"]
+albedo_color = Color(0.28, 0.45, 0.18, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="mat_grass_dark"]
+albedo_color = Color(0.2, 0.35, 0.12, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="mat_path"]
+albedo_color = Color(0.55, 0.45, 0.3, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="mat_stone"]
+albedo_color = Color(0.45, 0.45, 0.5, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mat_stone_dark"]
+albedo_color = Color(0.35, 0.35, 0.4, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mat_scorched"]
+albedo_color = Color(0.2, 0.15, 0.12, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="mat_wood"]
+albedo_color = Color(0.45, 0.32, 0.2, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mat_wood_dark"]
+albedo_color = Color(0.35, 0.25, 0.15, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mat_roof"]
+albedo_color = Color(0.5, 0.35, 0.25, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="mat_thatch"]
+albedo_color = Color(0.6, 0.5, 0.3, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="mat_water"]
+albedo_color = Color(0.2, 0.4, 0.6, 0.7)
+metallic = 0.1
+roughness = 0.1
+transparency = 1
+
+[sub_resource type="StandardMaterial3D" id="mat_mountain"]
+albedo_color = Color(0.4, 0.38, 0.42, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="mat_snow"]
+albedo_color = Color(0.95, 0.95, 0.98, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="mat_tree_trunk"]
+albedo_color = Color(0.35, 0.25, 0.15, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="mat_tree_leaves"]
+albedo_color = Color(0.2, 0.4, 0.15, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mat_pine_leaves"]
+albedo_color = Color(0.15, 0.3, 0.12, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mat_fire"]
+albedo_color = Color(1, 0.4, 0.1, 1)
+emission_enabled = true
+emission = Color(1, 0.5, 0.2, 1)
+emission_energy_multiplier = 2.0
+
+[sub_resource type="StandardMaterial3D" id="mat_ice"]
+albedo_color = Color(0.7, 0.85, 0.95, 0.8)
+metallic = 0.3
+roughness = 0.2
+transparency = 1
+
+[node name="LandsOfBalance" type="Node3D"]
+script = ExtResource("1_stage")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_balance")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 30, 50, 30)
+light_color = Color(1, 0.95, 0.85, 1)
+light_energy = 1.3
+shadow_enabled = true
+shadow_bias = 0.03
+
+[node name="Ground" type="Node3D" parent="."]
+
+[node name="MainGround" type="CSGBox3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+use_collision = true
+size = Vector3(300, 1, 300)
+material = SubResource("mat_grass")
+
+[node name="River" type="Node3D" parent="."]
+
+[node name="RiverBed" type="CSGBox3D" parent="River"]
+transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, -20, -0.8, 60)
+use_collision = true
+size = Vector3(12, 1.5, 180)
+material = SubResource("mat_stone_dark")
+
+[node name="RiverWater" type="CSGBox3D" parent="River"]
+transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, -20, 0.1, 60)
+size = Vector3(10, 0.8, 178)
+material = SubResource("mat_water")
+
+[node name="RiverBed2" type="CSGBox3D" parent="River"]
+transform = Transform3D(0.707, 0, 0.707, 0, 1, 0, -0.707, 0, 0.707, 40, -0.8, -40)
+use_collision = true
+size = Vector3(12, 1.5, 120)
+material = SubResource("mat_stone_dark")
+
+[node name="RiverWater2" type="CSGBox3D" parent="River"]
+transform = Transform3D(0.707, 0, 0.707, 0, 1, 0, -0.707, 0, 0.707, 40, 0.1, -40)
+size = Vector3(10, 0.8, 118)
+material = SubResource("mat_water")
+
+[node name="RiverLabel" type="Label3D" parent="River"]
+transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, 0, 3, 30)
+text = "The River"
+font_size = 32
+outline_size = 4
+
+[node name="VillageOfEights" type="Node3D" parent="."]
+
+[node name="VillageGround" type="CSGBox3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
+use_collision = true
+size = Vector3(40, 0.3, 40)
+material = SubResource("mat_path")
+
+[node name="House1Base" type="CSGBox3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 2, -8)
+use_collision = true
+size = Vector3(6, 4, 5)
+material = SubResource("mat_wood")
+
+[node name="House1Roof" type="CSGPolygon3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 4, -10.6)
+polygon = PackedVector2Array(-3.5, 0, 0, 2.5, 3.5, 0)
+depth = 5.4
+material = SubResource("mat_thatch")
+
+[node name="House2Base" type="CSGBox3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 2, -12)
+use_collision = true
+size = Vector3(5, 4, 5)
+material = SubResource("mat_wood")
+
+[node name="House2Roof" type="CSGPolygon3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 4, -14.6)
+polygon = PackedVector2Array(-3, 0, 0, 2, 3, 0)
+depth = 5.2
+material = SubResource("mat_thatch")
+
+[node name="House3Base" type="CSGBox3D" parent="VillageOfEights"]
+transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 8, 2, -6)
+use_collision = true
+size = Vector3(5, 4, 5)
+material = SubResource("mat_wood")
+
+[node name="House3Roof" type="CSGPolygon3D" parent="VillageOfEights"]
+transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 8, 4, -8.6)
+polygon = PackedVector2Array(-3, 0, 0, 2, 3, 0)
+depth = 5.2
+material = SubResource("mat_thatch")
+
+[node name="House4Base" type="CSGBox3D" parent="VillageOfEights"]
+transform = Transform3D(0.707, 0, 0.707, 0, 1, 0, -0.707, 0, 0.707, 12, 2, 4)
+use_collision = true
+size = Vector3(5, 4, 5)
+material = SubResource("mat_wood")
+
+[node name="House4Roof" type="CSGPolygon3D" parent="VillageOfEights"]
+transform = Transform3D(0.707, 0, 0.707, 0, 1, 0, -0.707, 0, 0.707, 12, 4, 1.4)
+polygon = PackedVector2Array(-3, 0, 0, 2, 3, 0)
+depth = 5.2
+material = SubResource("mat_thatch")
+
+[node name="House5Base" type="CSGBox3D" parent="VillageOfEights"]
+transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, -8, 2, 10)
+use_collision = true
+size = Vector3(5, 4, 5)
+material = SubResource("mat_wood")
+
+[node name="House5Roof" type="CSGPolygon3D" parent="VillageOfEights"]
+transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, -8, 4, 7.4)
+polygon = PackedVector2Array(-3, 0, 0, 2, 3, 0)
+depth = 5.2
+material = SubResource("mat_thatch")
+
+[node name="KeeperSeat" type="CSGBox3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+use_collision = true
+size = Vector3(8, 5, 8)
+material = SubResource("mat_stone")
+
+[node name="KeeperRoof" type="CSGPolygon3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, -4.5)
+polygon = PackedVector2Array(-5, 0, 0, 4, 5, 0)
+depth = 9
+material = SubResource("mat_roof")
+
+[node name="FirePit" type="CSGCylinder3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 6)
+use_collision = true
+radius = 1.5
+height = 0.6
+material = SubResource("mat_scorched")
+
+[node name="Well" type="CSGCylinder3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.6, -2)
+use_collision = true
+radius = 1.2
+height = 1.2
+material = SubResource("mat_stone")
+
+[node name="WellInner" type="CSGCylinder3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.7, -2)
+radius = 0.8
+height = 1.4
+material = SubResource("mat_water")
+
+[node name="VillageLabel" type="Label3D" parent="VillageOfEights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12, 0)
+text = "Village of Eights
+Seat of the Keeper"
+font_size = 48
+outline_size = 6
+
+[node name="CommonGround" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 70)
+
+[node name="ScorchedStone" type="CSGCylinder3D" parent="CommonGround"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+use_collision = true
+radius = 20.0
+height = 0.4
+material = SubResource("mat_scorched")
+
+[node name="ScorchedRing" type="CSGTorus3D" parent="CommonGround"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+inner_radius = 18.0
+outer_radius = 22.0
+material = SubResource("mat_stone_dark")
+
+[node name="CommonLabel" type="Label3D" parent="CommonGround"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)
+text = "Common Ground
+(Scorched Stone)"
+font_size = 48
+outline_size = 6
+
+[node name="TowerOfHakutnas" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -80, 0, -60)
+
+[node name="TowerBase" type="CSGBox3D" parent="TowerOfHakutnas"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+use_collision = true
+size = Vector3(30, 0.7, 30)
+material = SubResource("mat_stone")
+
+[node name="Tower" type="CSGCylinder3D" parent="TowerOfHakutnas"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 20, 0)
+use_collision = true
+radius = 6.0
+height = 40.0
+material = SubResource("mat_stone")
+
+[node name="TowerTop" type="CSGCylinder3D" parent="TowerOfHakutnas"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 42, 0)
+use_collision = true
+radius = 7.0
+height = 4.0
+material = SubResource("mat_stone_dark")
+
+[node name="TowerRoof" type="CSGCylinder3D" parent="TowerOfHakutnas"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 48, 0)
+radius = 8.0
+height = 8.0
+cone = true
+material = SubResource("mat_roof")
+
+[node name="TrainingRing" type="CSGCylinder3D" parent="TowerOfHakutnas"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 20)
+use_collision = true
+radius = 10.0
+height = 0.3
+material = SubResource("mat_path")
+
+[node name="Wall1" type="CSGBox3D" parent="TowerOfHakutnas"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1.5, 0)
+use_collision = true
+size = Vector3(0.8, 3, 30)
+material = SubResource("mat_stone")
+
+[node name="Wall2" type="CSGBox3D" parent="TowerOfHakutnas"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 1.5, 0)
+use_collision = true
+size = Vector3(0.8, 3, 30)
+material = SubResource("mat_stone")
+
+[node name="TowerLabel" type="Label3D" parent="TowerOfHakutnas"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 58, 0)
+text = "Tower of Hakutnas
+(Training Grounds)"
+font_size = 48
+outline_size = 6
+
+[node name="RealmOfHudson" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, -50)
+
+[node name="RealmGround" type="CSGBox3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+use_collision = true
+size = Vector3(50, 0.4, 50)
+material = SubResource("mat_grass_dark")
+
+[node name="Castle" type="CSGBox3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
+use_collision = true
+size = Vector3(16, 16, 16)
+material = SubResource("mat_stone")
+
+[node name="CastleTower1" type="CSGCylinder3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 12, -10)
+use_collision = true
+radius = 3.5
+height = 24.0
+material = SubResource("mat_stone")
+
+[node name="CastleTower1Roof" type="CSGCylinder3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 27, -10)
+radius = 4.0
+height = 6.0
+cone = true
+material = SubResource("mat_roof")
+
+[node name="CastleTower2" type="CSGCylinder3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 12, -10)
+use_collision = true
+radius = 3.5
+height = 24.0
+material = SubResource("mat_stone")
+
+[node name="CastleTower2Roof" type="CSGCylinder3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 27, -10)
+radius = 4.0
+height = 6.0
+cone = true
+material = SubResource("mat_roof")
+
+[node name="CastleTower3" type="CSGCylinder3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 12, 10)
+use_collision = true
+radius = 3.5
+height = 24.0
+material = SubResource("mat_stone")
+
+[node name="CastleTower3Roof" type="CSGCylinder3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 27, 10)
+radius = 4.0
+height = 6.0
+cone = true
+material = SubResource("mat_roof")
+
+[node name="CastleTower4" type="CSGCylinder3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 12, 10)
+use_collision = true
+radius = 3.5
+height = 24.0
+material = SubResource("mat_stone")
+
+[node name="CastleTower4Roof" type="CSGCylinder3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 27, 10)
+radius = 4.0
+height = 6.0
+cone = true
+material = SubResource("mat_roof")
+
+[node name="Fields" type="Node3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, 15)
+
+[node name="Field1" type="CSGBox3D" parent="RealmOfHudson/Fields"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+use_collision = true
+size = Vector3(6, 0.2, 6)
+material = SubResource("mat_grass")
+
+[node name="Field2" type="CSGBox3D" parent="RealmOfHudson/Fields"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.2, 0)
+use_collision = true
+size = Vector3(6, 0.2, 6)
+material = SubResource("mat_grass")
+
+[node name="Field3" type="CSGBox3D" parent="RealmOfHudson/Fields"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 7)
+use_collision = true
+size = Vector3(6, 0.2, 6)
+material = SubResource("mat_grass")
+
+[node name="Field4" type="CSGBox3D" parent="RealmOfHudson/Fields"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.2, 7)
+use_collision = true
+size = Vector3(6, 0.2, 6)
+material = SubResource("mat_grass")
+
+[node name="FieldsLabel" type="Label3D" parent="RealmOfHudson/Fields"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 4, 3)
+text = "Fields"
+font_size = 32
+outline_size = 4
+
+[node name="RealmLabel" type="Label3D" parent="RealmOfHudson"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 35, 0)
+text = "Realm of Hudson
+Kingdom of Prince Dawson"
+font_size = 48
+outline_size = 6
+
+[node name="Roads" type="Node3D" parent="."]
+
+[node name="TheLongRoad" type="CSGBox3D" parent="Roads"]
+transform = Transform3D(0.707, 0, -0.707, 0, 1, 0, 0.707, 0, 0.707, -40, 0.1, -30)
+use_collision = true
+size = Vector3(5, 0.25, 80)
+material = SubResource("mat_path")
+
+[node name="TradeRoad" type="CSGBox3D" parent="Roads"]
+transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 40, 0.1, -25)
+use_collision = true
+size = Vector3(5, 0.25, 90)
+material = SubResource("mat_path")
+
+[node name="NorthRoad" type="CSGBox3D" parent="Roads"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 35)
+use_collision = true
+size = Vector3(5, 0.25, 70)
+material = SubResource("mat_path")
+
+[node name="LongRoadLabel" type="Label3D" parent="Roads"]
+transform = Transform3D(0.707, 0, -0.707, 0, 1, 0, 0.707, 0, 0.707, -40, 2, -30)
+text = "The Long Road"
+font_size = 24
+outline_size = 4
+
+[node name="TradeRoadLabel" type="Label3D" parent="Roads"]
+transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 40, 2, -25)
+text = "Trade Road"
+font_size = 24
+outline_size = 4
+
+[node name="TheHills" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0, 20)
+
+[node name="Hill1" type="CSGSphere3D" parent="TheHills"]
+transform = Transform3D(1, 0.4, 0, 0, 0.4, 0, 0, 0, 1, 0, 0, 0)
+use_collision = true
+radius = 12.0
+material = SubResource("mat_grass")
+
+[node name="Hill2" type="CSGSphere3D" parent="TheHills"]
+transform = Transform3D(1, 0.35, 0, 0, 0.35, 0, 0, 0, 1, 18, 0, 8)
+use_collision = true
+radius = 10.0
+material = SubResource("mat_grass")
+
+[node name="Hill3" type="CSGSphere3D" parent="TheHills"]
+transform = Transform3D(1, 0.45, 0, 0, 0.45, 0, 0, 0, 1, -12, 0, 12)
+use_collision = true
+radius = 11.0
+material = SubResource("mat_grass")
+
+[node name="HillsLabel" type="Label3D" parent="TheHills"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)
+text = "The Hills"
+font_size = 36
+outline_size = 5
+
+[node name="BurningPeaks" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -120, 0, 0)
+
+[node name="Mountain1" type="CSGCylinder3D" parent="BurningPeaks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 0)
+use_collision = true
+radius = 25.0
+height = 50.0
+cone = true
+material = SubResource("mat_mountain")
+
+[node name="Mountain1Snow" type="CSGCylinder3D" parent="BurningPeaks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 45, 0)
+radius = 8.0
+height = 10.0
+cone = true
+material = SubResource("mat_snow")
+
+[node name="Mountain2" type="CSGCylinder3D" parent="BurningPeaks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 20, 25)
+use_collision = true
+radius = 20.0
+height = 40.0
+cone = true
+material = SubResource("mat_mountain")
+
+[node name="Mountain2Snow" type="CSGCylinder3D" parent="BurningPeaks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 38, 25)
+radius = 6.0
+height = 8.0
+cone = true
+material = SubResource("mat_snow")
+
+[node name="Mountain3" type="CSGCylinder3D" parent="BurningPeaks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 18, -20)
+use_collision = true
+radius = 18.0
+height = 36.0
+cone = true
+material = SubResource("mat_mountain")
+
+[node name="Mountain4" type="CSGCylinder3D" parent="BurningPeaks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 15, -15)
+use_collision = true
+radius = 15.0
+height = 30.0
+cone = true
+material = SubResource("mat_mountain")
+
+[node name="PeaksLabel" type="Label3D" parent="BurningPeaks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 55, 0)
+text = "The Burning Peaks"
+font_size = 48
+outline_size = 6
+
+[node name="FireCreatureLair" type="Node3D" parent="BurningPeaks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 10, 5)
+
+[node name="LairCave" type="CSGSphere3D" parent="BurningPeaks/FireCreatureLair"]
+use_collision = true
+radius = 8.0
+material = SubResource("mat_stone_dark")
+
+[node name="FireGlow" type="CSGSphere3D" parent="BurningPeaks/FireCreatureLair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5)
+radius = 3.0
+material = SubResource("mat_fire")
+
+[node name="LairLabel" type="Label3D" parent="BurningPeaks/FireCreatureLair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12, 0)
+modulate = Color(1, 0.5, 0.3, 1)
+text = "Lair of the
+Fire Creature"
+font_size = 32
+outline_size = 4
+
+[node name="SilentWoods" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 120, 0, 0)
+
+[node name="Tree1" type="Node3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="Trunk" type="CSGCylinder3D" parent="SilentWoods/Tree1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+use_collision = true
+radius = 1.0
+height = 10.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGCylinder3D" parent="SilentWoods/Tree1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 14, 0)
+radius = 6.0
+height = 12.0
+cone = true
+material = SubResource("mat_pine_leaves")
+
+[node name="Tree2" type="Node3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, 8)
+
+[node name="Trunk" type="CSGCylinder3D" parent="SilentWoods/Tree2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+use_collision = true
+radius = 1.2
+height = 12.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGCylinder3D" parent="SilentWoods/Tree2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 16, 0)
+radius = 7.0
+height = 14.0
+cone = true
+material = SubResource("mat_pine_leaves")
+
+[node name="Tree3" type="Node3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 15)
+
+[node name="Trunk" type="CSGCylinder3D" parent="SilentWoods/Tree3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
+use_collision = true
+radius = 0.8
+height = 8.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGCylinder3D" parent="SilentWoods/Tree3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11, 0)
+radius = 5.0
+height = 10.0
+cone = true
+material = SubResource("mat_pine_leaves")
+
+[node name="Tree4" type="Node3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -12)
+
+[node name="Trunk" type="CSGCylinder3D" parent="SilentWoods/Tree4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+use_collision = true
+radius = 1.0
+height = 10.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGCylinder3D" parent="SilentWoods/Tree4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 14, 0)
+radius = 6.0
+height = 12.0
+cone = true
+material = SubResource("mat_pine_leaves")
+
+[node name="Tree5" type="Node3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -8)
+
+[node name="Trunk" type="CSGCylinder3D" parent="SilentWoods/Tree5"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7, 0)
+use_collision = true
+radius = 1.3
+height = 14.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGCylinder3D" parent="SilentWoods/Tree5"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 18, 0)
+radius = 8.0
+height = 16.0
+cone = true
+material = SubResource("mat_pine_leaves")
+
+[node name="Tree6" type="Node3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0, -5)
+
+[node name="Trunk" type="CSGCylinder3D" parent="SilentWoods/Tree6"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+use_collision = true
+radius = 1.0
+height = 10.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGCylinder3D" parent="SilentWoods/Tree6"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 14, 0)
+radius = 6.0
+height = 12.0
+cone = true
+material = SubResource("mat_pine_leaves")
+
+[node name="Tree7" type="Node3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 0, 0)
+
+[node name="Trunk" type="CSGCylinder3D" parent="SilentWoods/Tree7"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+use_collision = true
+radius = 1.1
+height = 12.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGCylinder3D" parent="SilentWoods/Tree7"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 15, 0)
+radius = 7.0
+height = 14.0
+cone = true
+material = SubResource("mat_pine_leaves")
+
+[node name="Tree8" type="Node3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 20)
+
+[node name="Trunk" type="CSGCylinder3D" parent="SilentWoods/Tree8"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
+use_collision = true
+radius = 0.9
+height = 8.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGCylinder3D" parent="SilentWoods/Tree8"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11, 0)
+radius = 5.0
+height = 10.0
+cone = true
+material = SubResource("mat_pine_leaves")
+
+[node name="Tree9" type="Node3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0, -15)
+
+[node name="Trunk" type="CSGCylinder3D" parent="SilentWoods/Tree9"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, 0)
+use_collision = true
+radius = 1.0
+height = 10.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGCylinder3D" parent="SilentWoods/Tree9"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 14, 0)
+radius = 6.0
+height = 12.0
+cone = true
+material = SubResource("mat_pine_leaves")
+
+[node name="WoodsLabel" type="Label3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 0)
+text = "The Silent Woods"
+font_size = 48
+outline_size = 6
+
+[node name="SilentCreatureLair" type="Node3D" parent="SilentWoods"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="LairCave" type="CSGSphere3D" parent="SilentWoods/SilentCreatureLair"]
+use_collision = true
+radius = 8.0
+material = SubResource("mat_stone_dark")
+
+[node name="IceGlow" type="CSGSphere3D" parent="SilentWoods/SilentCreatureLair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5)
+radius = 3.0
+material = SubResource("mat_ice")
+
+[node name="LairLabel" type="Label3D" parent="SilentWoods/SilentCreatureLair"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12, 0)
+modulate = Color(0.5, 0.7, 1, 1)
+text = "Lair of the
+Silent Creature"
+font_size = 32
+outline_size = 4
+
+[node name="ScatteredTrees" type="Node3D" parent="."]
+
+[node name="Tree1" type="Node3D" parent="ScatteredTrees"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 0, 15)
+
+[node name="Trunk" type="CSGCylinder3D" parent="ScatteredTrees/Tree1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+use_collision = true
+radius = 0.6
+height = 6.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGSphere3D" parent="ScatteredTrees/Tree1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
+radius = 4.0
+material = SubResource("mat_tree_leaves")
+
+[node name="Tree2" type="Node3D" parent="ScatteredTrees"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, 40)
+
+[node name="Trunk" type="CSGCylinder3D" parent="ScatteredTrees/Tree2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
+use_collision = true
+radius = 0.7
+height = 8.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGSphere3D" parent="ScatteredTrees/Tree2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)
+radius = 5.0
+material = SubResource("mat_tree_leaves")
+
+[node name="Tree3" type="Node3D" parent="ScatteredTrees"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 0, -20)
+
+[node name="Trunk" type="CSGCylinder3D" parent="ScatteredTrees/Tree3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
+use_collision = true
+radius = 0.65
+height = 7.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGSphere3D" parent="ScatteredTrees/Tree3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, 0)
+radius = 4.5
+material = SubResource("mat_tree_leaves")
+
+[node name="Tree4" type="Node3D" parent="ScatteredTrees"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -55, 0, -25)
+
+[node name="Trunk" type="CSGCylinder3D" parent="ScatteredTrees/Tree4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+use_collision = true
+radius = 0.6
+height = 6.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGSphere3D" parent="ScatteredTrees/Tree4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
+radius = 4.0
+material = SubResource("mat_tree_leaves")
+
+[node name="Tree5" type="Node3D" parent="ScatteredTrees"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35, 0, 45)
+
+[node name="Trunk" type="CSGCylinder3D" parent="ScatteredTrees/Tree5"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0)
+use_collision = true
+radius = 0.7
+height = 8.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGSphere3D" parent="ScatteredTrees/Tree5"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)
+radius = 5.0
+material = SubResource("mat_tree_leaves")
+
+[node name="Tree6" type="Node3D" parent="ScatteredTrees"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, -50)
+
+[node name="Trunk" type="CSGCylinder3D" parent="ScatteredTrees/Tree6"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.5, 0)
+use_collision = true
+radius = 0.65
+height = 7.0
+material = SubResource("mat_tree_trunk")
+
+[node name="Leaves" type="CSGSphere3D" parent="ScatteredTrees/Tree6"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, 0)
+radius = 4.5
+material = SubResource("mat_tree_leaves")
