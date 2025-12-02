@@ -11,6 +11,7 @@ const ACCEL: float = 12.0
 const DEACCEL: float = 12.0
 const JUMP_VELOCITY: float = 6.0
 const MOUSE_SENSITIVITY: float = 0.002
+const GAMEPAD_SENSITIVITY: float = 2.5  # radians per second at full stick
 const CAMERA_VERTICAL_LIMIT: float = 85.0  # degrees
 
 # Combat mode enum
@@ -513,21 +514,29 @@ func _input(event: InputEvent) -> void:
 		else:
 			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
-	# Toggle combat mode with Tab or middle mouse button
-	if event is InputEventKey and event.pressed and event.keycode == KEY_TAB:
+	# Toggle combat mode with Tab, middle mouse button, or gamepad Back button
+	if event.is_action_pressed(&"toggle_combat"):
 		_toggle_combat_mode()
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
+	elif event is InputEventKey and event.pressed and event.keycode == KEY_TAB:
+		_toggle_combat_mode()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
 		_toggle_combat_mode()
 
-	# Attack with left mouse button or F key
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+	# Attack with left mouse button, F key, or gamepad X button
+	if event.is_action_pressed(&"attack"):
+		_do_attack()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 			_do_attack()
-	if event is InputEventKey and event.pressed and event.keycode == KEY_F:
+	elif event is InputEventKey and event.pressed and event.keycode == KEY_F:
 		_do_attack()
 
-	# Block with right mouse button (armed mode)
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+	# Block with right mouse button or gamepad LB
+	if event.is_action_pressed(&"block"):
+		is_blocking = true
+	elif event.is_action_released(&"block"):
+		is_blocking = false
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
 		if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 			is_blocking = event.pressed
 
@@ -544,6 +553,16 @@ func _input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	if _attack_cooldown > 0:
 		_attack_cooldown -= delta
+
+	# Gamepad camera control (right stick)
+	var look_x: float = Input.get_action_strength(&"camera_look_right") - Input.get_action_strength(&"camera_look_left")
+	var look_y: float = Input.get_action_strength(&"camera_look_down") - Input.get_action_strength(&"camera_look_up")
+	if abs(look_x) > 0.01 or abs(look_y) > 0.01:
+		camera_rotation.x -= look_x * GAMEPAD_SENSITIVITY * delta
+		camera_rotation.y -= look_y * GAMEPAD_SENSITIVITY * delta
+		camera_rotation.y = clamp(camera_rotation.y, deg_to_rad(-CAMERA_VERTICAL_LIMIT), deg_to_rad(CAMERA_VERTICAL_LIMIT))
+		_camera_pivot.rotation.y = camera_rotation.x
+		_camera_pivot.rotation.x = camera_rotation.y
 
 	if Input.is_action_pressed(&"reset_position") or global_position.y < -12:
 		position = initial_position

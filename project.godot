@@ -8,74 +8,6 @@
 
 config_version=5
 
-[SimpleGrassTextured]
-
-Shortcuts/airbrush_tool=Object(Shortcut,"resource_local_to_scene":false,"resource_name":"","events":[Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":true,"keycode":68,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-],"script":null)
-
-Shortcuts/pencil_tool=Object(Shortcut,"resource_local_to_scene":false,"resource_name":"","events":[Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":true,"keycode":66,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-],"script":null)
-
-Shortcuts/eraser_tool=Object(Shortcut,"resource_local_to_scene":false,"resource_name":"","events":[Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":true,"keycode":88,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-],"script":null)
-
-Shortcuts/radius_increment=Object(Shortcut,"resource_local_to_scene":false,"resource_name":"","events":[Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":true,"keycode":93,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-],"script":null)
-
-Shortcuts/radius_decrement=Object(Shortcut,"resource_local_to_scene":false,"resource_name":"","events":[Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":true,"keycode":91,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-],"script":null)
-
-Shortcuts/density_increment=Object(Shortcut,"resource_local_to_scene":false,"resource_name":"","events":[Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":true,"keycode":61,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-],"script":null)
-
-Shortcuts/density_decrement=Object(Shortcut,"resource_local_to_scene":false,"resource_name":"","events":[Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":true,"keycode":45,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-],"script":null)
-
-
-[addons]
-
-humanizer/cache_equipment_weights=true
-humanizer/slots={
-&"Body Parts": {
-&"body": "Body",
-&"hair": "Hair",
-&"lefteye": "Left Eye",
-&"lefteyebrow": "Left Eyebrow",
-&"lefteyelash": "Left Eyelash",
-&"righteye": "Right Eye",
-&"righteyebrow": "Right Eyebrow",
-&"righteyelash": "Right Eyelash",
-&"teeth": "Teeth",
-&"tongue": "Tongue"
-},
-&"Clothing": {
-&"armsclothes": "Arms",
-&"eyesclothes": "Eyes",
-&"feetclothes": "Feet",
-&"handsclothes": "Hands",
-&"headclothes": "Head",
-&"legsclothes": "Legs",
-&"mouthclothes": "Mouth",
-&"torsoclothes": "Torso"
-}
-}
-humanizer/asset_import_paths=PackedStringArray("res://addons/humanizer/data/assets/", "res://addons/humanizer_assets/", "user://humanizer/", "res://humanizer/")
-humanizer/human_export_path="res://data/humans/"
-humanizer/default_characterbody_script="res://addons/humanizer/scripts/utils/human_controller.gd"
-humanizer/default_rigidbody_script=""
-humanizer/default_staticbody_script=""
-humanizer/default_area_script=""
-humanizer/default_skeleton="game_engine-RETARGETED"
-humanizer/default_animation_tree="res://addons/humanizer/data/animations/animation_tree.tscn"
-humanizer/default_baked_root_node="CharacterBody3D"
-humanizer/character_physics_layers=2
-humanizer/character_physics_mask=3
-humanizer/staticbody_physics_layers=1
-humanizer/physical_bone_layers=4
-humanizer/physical_bone_mask=5
-humanizer/character_render_layers=1
-humanizer/atlas_resolution=2048
-
 [application]
 
 config/name="Douglass The Keeper"
@@ -86,11 +18,6 @@ run/main_scene="res://game.tscn"
 config/features=PackedStringArray("4.5")
 config/icon="res://icon.webp"
 
-[autoload]
-
-HumanizerAPI="*res://addons/humanizer/scenes/humanizer_api.tscn"
-SimpleGrass="*res://addons/simplegrasstextured/singleton.tscn"
-
 [debug]
 
 gdscript/warnings/untyped_declaration=1
@@ -99,10 +26,6 @@ gdscript/warnings/untyped_declaration=1
 
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-
-[editor_plugins]
-
-enabled=PackedStringArray("res://addons/humanizer/plugin.cfg", "res://addons/simplegrasstextured/plugin.cfg")
 
 [input]
 
@@ -225,6 +148,45 @@ run={
 , Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":7,"pressure":0.0,"pressed":false,"script":null)
 ]
 }
+camera_look_right={
+"deadzone": 0.15,
+"events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":2,"axis_value":1.0,"script":null)
+]
+}
+camera_look_left={
+"deadzone": 0.15,
+"events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":2,"axis_value":-1.0,"script":null)
+]
+}
+camera_look_up={
+"deadzone": 0.15,
+"events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":3,"axis_value":-1.0,"script":null)
+]
+}
+camera_look_down={
+"deadzone": 0.15,
+"events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":3,"axis_value":1.0,"script":null)
+]
+}
+attack={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":70,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":1,"canceled":false,"pressed":false,"double_click":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":2,"pressure":0.0,"pressed":false,"script":null)
+]
+}
+block={
+"deadzone": 0.2,
+"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":2,"canceled":false,"pressed":false,"double_click":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":4,"pressure":0.0,"pressed":false,"script":null)
+]
+}
+toggle_combat={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194306,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":6,"pressure":0.0,"pressed":false,"script":null)
+]
+}
 
 [physics]
 
@@ -245,46 +207,3 @@ textures/decals/filter=1
 anti_aliasing/quality/use_debanding=true
 lights_and_shadows/positional_shadow/atlas_size=512
 lights_and_shadows/positional_shadow/atlas_size.mobile=256
-
-[shader_globals]
-
-sgt_legacy_renderer={
-"type": "int",
-"value": 0
-}
-sgt_player_position={
-"type": "vec3",
-"value": Vector3(1000000, 1000000, 1000000)
-}
-sgt_player_mov={
-"type": "vec3",
-"value": Vector3(0, 0, 0)
-}
-sgt_normal_displacement={
-"type": "sampler2D",
-"value": "res://addons/simplegrasstextured/images/normal.png"
-}
-sgt_motion_texture={
-"type": "sampler2D",
-"value": "res://addons/simplegrasstextured/images/motion.png"
-}
-sgt_wind_direction={
-"type": "vec3",
-"value": Vector3(1, 0, 0)
-}
-sgt_wind_movement={
-"type": "vec3",
-"value": Vector2(0, 0)
-}
-sgt_wind_strength={
-"type": "float",
-"value": 0.15
-}
-sgt_wind_turbulence={
-"type": "float",
-"value": 1.0
-}
-sgt_wind_pattern={
-"type": "sampler2D",
-"value": "res://addons/simplegrasstextured/images/wind_pattern.png"
-}
