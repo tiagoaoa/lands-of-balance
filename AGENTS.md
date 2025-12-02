@@ -58,25 +58,56 @@ timeout 60 /home/talves/bin/godot --path /home/talves/mthings/tpgame/godot-demo-
 | Silent Creature Lair | (120, 1) |
 | Fields | (60, -35) |
 
-## Adding 3D Assets
-1. Copy GLB/FBX to `assets/` directory
-2. Run headless import: `godot --headless --import`
-3. Create loader script if collision is needed (see `village_loader.gd`)
-4. Add to scene via `.tscn` file or instantiate in script
+## Adding 3D Assets with Auto-Collision
 
-## Collision for Imported Models
-Use trimesh collision for accurate building/terrain collision:
-```gdscript
-func _create_collision_for_mesh(mesh_instance: MeshInstance3D) -> void:
-    var mesh: Mesh = mesh_instance.mesh
-    var static_body := StaticBody3D.new()
-    var collision_shape := CollisionShape3D.new()
-    collision_shape.shape = mesh.create_trimesh_shape()
-    static_body.add_child(collision_shape)
-    static_body.transform = mesh_instance.transform
-    mesh_instance.get_parent().add_child(static_body)
+### Option 1: Via Agent Instructions
+Tell the agent:
 ```
+"Add [asset_name.glb] from [path] at position (x, y, z) with trimesh collision"
+```
+The agent will:
+1. Copy asset to `assets/`
+2. Import it
+3. Add AssetLoader node to scene with proper collision
 
-## External Asset Sources
+### Option 2: Manual in Godot Editor
+1. Copy GLB/FBX to `assets/` folder
+2. In Scene tree, add new Node3D
+3. Attach `stage/asset_loader.gd` script
+4. In Inspector, set:
+   - `Asset Path`: select your GLB/FBX
+   - `Collision Type`: TRIMESH (buildings/terrain), CONVEX (props), NONE (decorative)
+   - `Scale Factor`: adjust size
+   - `Rotation Offset`: fix orientation if needed
+
+### Option 3: Quick Collision in Editor
+1. Drag GLB/FBX into scene
+2. Select the MeshInstance3D
+3. Right-click → "Create Trimesh Static Body"
+
+## AssetLoader Script
+`stage/asset_loader.gd` - Generic loader with auto-collision:
+- **TRIMESH**: Accurate collision for buildings, rocks, terrain
+- **CONVEX**: Fast collision for simple props
+- **NONE**: No collision for decorative objects
+
+## Free Asset Sources
+- **Kenney.nl**: https://kenney.nl/assets (CC0 license)
+- **Quaternius**: https://quaternius.com (CC0 license)
+- **Poly.pizza**: https://poly.pizza (various licenses)
+- **Sketchfab**: https://sketchfab.com (filter by downloadable)
+- **AmbientCG**: https://ambientcg.com (CC0 textures/materials)
+
+## External Asset Directories
 - FBX animations: `/home/talves/mthings/fbxs/` and `/home/talves/mthings/fbx2/`
 - GLB models: `/home/talves/mthings/glbs/`
+
+## Collision Types Guide
+| Asset Type | Collision | Why |
+|------------|-----------|-----|
+| Buildings | TRIMESH | Accurate walls, player can't walk through |
+| Terrain/Mountains | TRIMESH | Player can climb slopes |
+| Rocks | TRIMESH or CONVEX | TRIMESH for climbable, CONVEX for obstacles |
+| Trees | CONVEX (trunk only) | Simple collision, leaves don't need it |
+| Props (barrels, crates) | CONVEX | Fast and sufficient |
+| Grass, flowers | NONE | Decorative, no collision |

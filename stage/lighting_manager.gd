@@ -36,22 +36,22 @@ const DAY_SETTINGS := {
 	"light_rotation": Vector3(-45, -45, 0),
 }
 
-# Night preset (foggy forest atmosphere)
+# Night preset (foggy forest atmosphere) - 40% darker
 const NIGHT_SETTINGS := {
-	"background_energy": 0.225,
+	"background_energy": 0.135,
 	"ambient_color": Color(0.12, 0.15, 0.2),
-	"ambient_energy": 0.45,
+	"ambient_energy": 0.27,
 	"ambient_sky_contribution": 0.0,
 	"fog_enabled": true,
 	"fog_density": 0.025,
 	"fog_color": Color(0.4, 0.45, 0.5),
-	"fog_light_energy": 0.3,
+	"fog_light_energy": 0.18,
 	"volumetric_fog_enabled": true,
 	"ssao_enabled": true,
 	"adjustment_enabled": true,
 	"glow_enabled": true,
 	"light_color": Color(0.6, 0.65, 0.75),
-	"light_energy": 0.375,
+	"light_energy": 0.225,
 	"light_rotation": Vector3(-15, -45, 0),
 }
 
@@ -116,7 +116,7 @@ func _apply_lighting() -> void:
 		env.volumetric_fog_density = 0.03
 		env.volumetric_fog_albedo = Color(0.5, 0.55, 0.6)
 		env.volumetric_fog_emission = Color(0.02, 0.025, 0.03)
-		env.volumetric_fog_emission_energy = 0.5
+		env.volumetric_fog_emission_energy = 0.3
 		env.volumetric_fog_length = 80.0
 
 	# SSAO (night only)
@@ -128,15 +128,15 @@ func _apply_lighting() -> void:
 	# Color adjustment (night only)
 	env.adjustment_enabled = settings.adjustment_enabled
 	if settings.adjustment_enabled:
-		env.adjustment_brightness = 0.85
+		env.adjustment_brightness = 0.51
 		env.adjustment_contrast = 1.15
 		env.adjustment_saturation = 0.6
 
 	# Glow (night only)
 	env.glow_enabled = settings.glow_enabled
 	if settings.glow_enabled:
-		env.glow_intensity = 0.4
-		env.glow_strength = 0.8
+		env.glow_intensity = 0.24
+		env.glow_strength = 0.48
 		env.glow_bloom = 0.1
 		env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
 
@@ -184,12 +184,12 @@ func _transition_lighting() -> void:
 			env.ssao_radius = 2.0
 			env.ssao_intensity = 1.5
 		if settings.adjustment_enabled:
-			env.adjustment_brightness = 0.85
+			env.adjustment_brightness = 0.51
 			env.adjustment_contrast = 1.15
 			env.adjustment_saturation = 0.6
 		if settings.glow_enabled:
-			env.glow_intensity = 0.4
-			env.glow_strength = 0.8
+			env.glow_intensity = 0.24
+			env.glow_strength = 0.48
 	).set_delay(transition_duration * 0.5)
 
 

@@ -11,7 +11,8 @@
 [ext_resource type="PackedScene" uid="uid://dukdx43suoeqp" path="res://assets/bunratty_castle.glb" id="10_grb1b"]
 [ext_resource type="PackedScene" uid="uid://cqorrhm68dacv" path="res://assets/realistic_grass.glb" id="10_wdnaj"]
 [ext_resource type="Script" uid="uid://cqt5ps4836h1y" path="res://stage/village_loader.gd" id="11_village"]
-[ext_resource type="PackedScene" uid="uid://dj6te728xfgwg" path="res://assets/village_of_eights.glb" id="13_ropnn"]
+[ext_resource type="ArrayMesh" uid="uid://cjuambqh6hteo" path="res://assets/mountain.obj" id="13_mountain"]
+[ext_resource type="Script" path="res://stage/hills_collision.gd" id="14_hills_script"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_15kie"]
 sky_top_color = Color(0.15, 0.18, 0.25, 1)
@@ -80,13 +81,10 @@ albedo_color = Color(0.2, 0.4, 0.6, 0.7)
 metallic = 0.1
 roughness = 0.1
 
-[sub_resource type="StandardMaterial3D" id="mat_stone"]
-albedo_color = Color(0.45, 0.45, 0.5, 1)
-roughness = 0.85
-
 [sub_resource type="StandardMaterial3D" id="mat_path"]
 albedo_color = Color(0.55, 0.45, 0.3, 1)
 roughness = 0.95
+
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_16tto"]
 resource_name = "grass"
@@ -276,9 +274,10 @@ script = ExtResource("2_js6ng")
 environment = SubResource("Environment_wdnaj")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.5262584, 0.22008015, -0.82135063, -9.642972e-10, 0.9659259, 0.25881895, 0.85032475, -0.13620564, 0.5083266, 81.52707, 69.04639, 59.595867)
+transform = Transform3D(0.5262583, 0.22008014, -0.8213507, -9.642971e-10, 0.9659258, 0.25881895, 0.8503247, -0.13620561, 0.50832653, 176.20892, 4804.189, 4579.207)
+layers = 0
 light_color = Color(0.6, 0.65, 0.75, 1)
-light_energy = 0.375
+light_energy = 0.1
 light_indirect_energy = 0.2
 shadow_enabled = true
 shadow_bias = 0.03
@@ -287,9 +286,9 @@ shadow_opacity = 0.8
 [node name="Ground" type="Node3D" parent="."]
 
 [node name="MainGround" type="CSGBox3D" parent="Ground"]
-transform = Transform3D(0.9999987, -7.0950384e-11, -0.0016231555, 7.0950384e-11, 1, -5.731884e-14, 0.0016231555, -5.731884e-14, 0.9999987, -17.700104, -0.5, 15.765869)
+transform = Transform3D(0.9999987, -7.0950384e-11, -0.0016231555, 7.0950384e-11, 1, -5.731884e-14, 0.0016231555, -5.731884e-14, 0.9999987, 92.36858, -0.5, -170.25363)
 use_collision = true
-size = Vector3(419.32623, 1, 331.53174)
+size = Vector3(1070.5386, 1, 1144.983)
 material = SubResource("StandardMaterial3D_0t235")
 
 [node name="River" type="Node3D" parent="."]
@@ -339,14 +338,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 70)
 [node name="TowerOfHakutnas" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -80, 0, -60)
 
-[node name="Wall2" type="CSGBox3D" parent="TowerOfHakutnas"]
-transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 100, -15, -30)
-use_collision = true
-size = Vector3(0.8, 3, 30)
-material = SubResource("mat_stone")
-
 [node name="TowerLabel" type="Label3D" parent="TowerOfHakutnas"]
-transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 100, -15, -30)
+transform = Transform3D(4.9708586, 0.5390425, 0, -0.5390425, 4.9708586, 0, 0, 0, 5, 393.03516, -49.90307, -479.46985)
 text = "Tower of Hakutnas
 (Training Grounds)"
 font_size = 48
@@ -359,12 +352,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, -50)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, 15)
 
 [node name="FieldsLabel" type="Label3D" parent="RealmOfHudson/Fields"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 4, 3)
+transform = Transform3D(1, 0, 0, 0, 0.7952831, -0.60623825, 0, 0.60623825, 0.7952831, 3, 3.7560558, -3.6109314)
 text = "Fields"
 outline_size = 4
 
 [node name="RealmLabel" type="Label3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 35, 0)
+transform = Transform3D(1, 0, 0, 0, 0.7952831, -0.60623825, 0, 0.60623825, 0.7952831, 0, 39.32212, 15.867355)
 text = "Realm of Hudson
 Kingdom of Prince Dawson"
 font_size = 48
@@ -391,16 +384,25 @@ size = Vector3(5, 0.25, 70)
 material = SubResource("mat_path")
 
 [node name="TradeRoadLabel" type="Label3D" parent="Roads"]
-transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 40, 2, -25)
+transform = Transform3D(0.866, 0, -0.5, -0.30311912, 0.7952831, -0.5250023, 0.39764154, 0.60623825, 0.68871516, 40, -2.0781784, -34.256428)
 text = "Trade Road"
 font_size = 24
 outline_size = 4
 
-[node name="TheHills" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0, 20)
+[node name="TheHills" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -20, -250)
+script = ExtResource("14_hills_script")
+
+[node name="HillsMesh" type="MeshInstance3D" parent="TheHills"]
+transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, -354.93457, -72.4234, -539.79333)
+mesh = ExtResource("13_mountain")
+
+[node name="HillsCollision" type="CollisionShape3D" parent="TheHills"]
+transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, -354.93457, -72.4234, -539.79333)
+
 
 [node name="HillsLabel" type="Label3D" parent="TheHills"]
-transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 100, -15, -30)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 120, 0)
 text = "The Hills"
 font_size = 36
 outline_size = 5
@@ -448,10 +450,7 @@ transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -7.9872665, -0.25731087
 transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 26.723375, -0.042243004, 11.732845)
 
 [node name="Sketchfab_Scene3" parent="." instance=ExtResource("10_grb1b")]
-transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 120.95279, 138.71138, 228.59973)
+transform = Transform3D(0.2982515, 0.032342546, 0, -0.032342546, 0.2982515, 0, 0, 0, 0.29999998, 134.51343, 181.82414, 228.59973)
 
 [node name="Sketchfab_Scene4" parent="." instance=ExtResource("10_grb1b")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 228.75511, -19.162258, 414.59692)
-
-[node name="Sketchfab_Scene5" parent="." instance=ExtResource("13_ropnn")]
-transform = Transform3D(4.9968157, 0, -0.17842203, 0, 5, 0, 0.17842203, 0, 4.9968157, 100, -15, -30)
+transform = Transform3D(0.9941717, 0.10780849, 0, -0.10780849, 0.9941717, 0, 0, 0, 1, 224.66736, 13.248631, 414.59692)

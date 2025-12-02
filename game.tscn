@@ -8,7 +8,7 @@
 [node name="Game" type="Node3D"]
 
 [node name="LandsOfBalance" parent="." instance=ExtResource("1_lands")]
-transform = Transform3D(0.99989533, 6.324284e-10, 0.014468275, -6.324284e-10, 1, -4.5750855e-12, -0.014468275, -4.5750855e-12, 0.99989533, 11.018539, 0, -27.122612)
+transform = Transform3D(0.99989533, 6.324284e-10, 0.014468275, -6.324284e-10, 1, -4.5750855e-12, -0.014468275, -4.5750855e-12, 0.99989533, 3.0857086, 0, -33.224766)
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 10)
