@@ -1,35 +1,62 @@
-[gd_scene load_steps=48 format=4 uid="uid://d4jg7hfoo7twl"]
+[gd_scene load_steps=47 format=4]
 
-[ext_resource type="Script" uid="uid://vw47tquoshc7" path="res://stage/stage.gd" id="1_stage"]
-[ext_resource type="Script" uid="uid://cuveftns1euyj" path="res://stage/village_decorator.gd" id="2_decorator"]
-[ext_resource type="Shader" uid="uid://bromrf0kc05o8" path="res://stage/skybox.gdshader" id="2_skybox"]
-[ext_resource type="Script" uid="uid://dyklxrtfeopq3" path="res://stage/realistic_castle.gd" id="3_castle"]
-[ext_resource type="CompressedCubemap" uid="uid://bnqdokul6s4pt" path="res://stage/skybox.webp" id="3_skybox_tex"]
-[ext_resource type="Texture2D" uid="uid://d1a860c4rdhny" path="res://assets/textures/Ground037_1K-JPG_Color.jpg" id="4_js6ng"]
-[ext_resource type="Texture2D" uid="uid://qwev4imcwa6t" path="res://assets/textures/Ground037_1K-JPG_AmbientOcclusion.jpg" id="5_wdnaj"]
-[ext_resource type="Texture2D" uid="uid://btgo46veltw5p" path="res://assets/textures/Ground037_1K-JPG_NormalGL.jpg" id="6_grb1b"]
-[ext_resource type="Texture2D" uid="uid://timtsnrreaat" path="res://assets/textures/Ground037_1K-JPG_Roughness.jpg" id="7_5v762"]
-[ext_resource type="PackedScene" uid="uid://cqorrhm68dacv" path="res://assets/realistic_grass.glb" id="10_wdnaj"]
+[ext_resource type="Script" path="res://stage/stage.gd" id="1_stage"]
+[ext_resource type="Script" path="res://stage/village_decorator.gd" id="2_decorator"]
+[ext_resource type="Script" path="res://stage/lighting_manager.gd" id="2_js6ng"]
+[ext_resource type="Script" path="res://stage/realistic_castle.gd" id="3_castle"]
+[ext_resource type="Texture2D" path="res://assets/textures/Ground037_1K-JPG_Color.jpg" id="4_js6ng"]
+[ext_resource type="Texture2D" path="res://assets/textures/Ground037_1K-JPG_AmbientOcclusion.jpg" id="5_wdnaj"]
+[ext_resource type="Texture2D" path="res://assets/textures/Ground037_1K-JPG_NormalGL.jpg" id="6_grb1b"]
+[ext_resource type="Texture2D" path="res://assets/textures/Ground037_1K-JPG_Roughness.jpg" id="7_5v762"]
+[ext_resource type="PackedScene" path="res://assets/realistic_grass.glb" id="10_wdnaj"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
-shader = ExtResource("2_skybox")
-shader_parameter/source_panorama = ExtResource("3_skybox_tex")
-shader_parameter/exposure = 1.0
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_15kie"]
+sky_top_color = Color(0.15, 0.18, 0.25, 1)
+sky_horizon_color = Color(0.3, 0.35, 0.4, 1)
+ground_bottom_color = Color(0.1, 0.12, 0.15, 1)
+ground_horizon_color = Color(0.25, 0.28, 0.32, 1)
+sun_angle_max = 0.0
 
-[sub_resource type="Sky" id="Sky_balance"]
-sky_material = SubResource("ShaderMaterial_sky")
+[sub_resource type="Sky" id="Sky_js6ng"]
+sky_material = SubResource("ProceduralSkyMaterial_15kie")
 
-[sub_resource type="Environment" id="Environment_balance"]
+[sub_resource type="Environment" id="Environment_wdnaj"]
 background_mode = 2
-sky = SubResource("Sky_balance")
+background_energy_multiplier = 0.225
+sky = SubResource("Sky_js6ng")
 ambient_light_source = 2
-ambient_light_color = Color(0.7, 0.75, 0.8, 1)
-ambient_light_sky_contribution = 0.3
-tonemap_mode = 4
+ambient_light_color = Color(0.12, 0.15, 0.2, 1)
+ambient_light_energy = 0.45
+tonemap_mode = 2
+tonemap_exposure = 0.8
+ssao_enabled = true
+ssao_radius = 2.0
+ssao_intensity = 1.5
+ssao_power = 2.0
+ssao_light_affect = 0.3
+glow_enabled = true
+glow_intensity = 0.4
+glow_strength = 0.8
+glow_bloom = 0.1
 fog_enabled = true
-fog_light_color = Color(0.75, 0.82, 0.9, 1)
-fog_density = 0.001
-fog_sky_affect = 0.4
+fog_light_color = Color(0.4, 0.45, 0.5, 1)
+fog_light_energy = 0.3
+fog_density = 0.025
+fog_sky_affect = 0.8
+fog_height_density = 0.1
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.03
+volumetric_fog_albedo = Color(0.5, 0.55, 0.6, 1)
+volumetric_fog_emission = Color(0.02, 0.025, 0.03, 1)
+volumetric_fog_emission_energy = 0.5
+volumetric_fog_anisotropy = 0.3
+volumetric_fog_length = 80.0
+volumetric_fog_detail_spread = 0.8
+volumetric_fog_ambient_inject = 0.1
+adjustment_enabled = true
+adjustment_brightness = 0.85
+adjustment_contrast = 1.15
+adjustment_saturation = 0.6
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0t235"]
 albedo_texture = ExtResource("4_js6ng")
@@ -295,15 +322,20 @@ buffer = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 [node name="LandsOfBalance" type="Node3D"]
 script = ExtResource("1_stage")
 
+[node name="LightingManager" type="Node" parent="."]
+script = ExtResource("2_js6ng")
+
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_balance")
+environment = SubResource("Environment_wdnaj")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 30, 50, 30)
-light_color = Color(1, 0.95, 0.85, 1)
-light_energy = 1.3
+transform = Transform3D(0.70709115, 0.18298607, -0.6829132, 0, 0.96578526, 0.25878134, 0.70709115, -0.18298607, 0.6829132, 30, 50, 30)
+light_color = Color(0.6, 0.65, 0.75, 1)
+light_energy = 0.375
+light_indirect_energy = 0.2
 shadow_enabled = true
 shadow_bias = 0.03
+shadow_opacity = 0.8
 
 [node name="Ground" type="Node3D" parent="."]
 
@@ -1069,8 +1101,8 @@ multimesh = SubResource("MultiMesh_grb1b")
 cast_shadow = 0
 multimesh = SubResource("MultiMesh_5v762")
 
-[node name="Sketchfab_Scene" parent="." instance=ExtResource("10_wdnaj")]
+[node name="Sketchfab_Scene" type="Node3D" parent="." instance=ExtResource("10_wdnaj")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -7.9872665, -0.25731087, -19.308586)
 
-[node name="Sketchfab_Scene2" parent="." instance=ExtResource("10_wdnaj")]
+[node name="Sketchfab_Scene2" type="Node3D" parent="." instance=ExtResource("10_wdnaj")]
 transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 26.723375, -0.042243004, 11.732845)
