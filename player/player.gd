@@ -47,6 +47,7 @@ const ARMED_ANIM_PATHS: Dictionary = {
 	"attack2": "res://player/character/armed/Attack2.fbx",
 	"block": "res://player/character/armed/Block.fbx",
 	"sheath": "res://player/character/armed/Sheath.fbx",
+	"spell_cast": "res://player/character/armed/SpellCast.fbx",
 }
 
 var camera_rotation := Vector2.ZERO  # x = yaw, y = pitch
@@ -67,8 +68,18 @@ var is_attacking: bool = false
 var is_blocking: bool = false
 var is_sheathing: bool = false
 var is_transitioning: bool = false  # For attack/idle transitions
+var is_casting: bool = false
 var attack_combo: int = 0
 var _attack_cooldown: float = 0.0
+
+# Spell VFX components
+var _spell_effects_container: Node3D
+var _lightning_particles: GPUParticles3D
+var _rising_sparks: GPUParticles3D
+var _magic_circle: MeshInstance3D
+var _spell_light: OmniLight3D
+var _lightning_bolts: GPUParticles3D
+var _spell_tween: Tween
 
 @onready var initial_position := position
 @onready var gravity: Vector3 = ProjectSettings.get_setting("physics/3d/default_gravity") * \
@@ -81,6 +92,7 @@ var _attack_cooldown: float = 0.0
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	_create_characters()
+	_create_lightning_particles()
 
 
 func _create_characters() -> void:
@@ -128,6 +140,304 @@ func _create_characters() -> void:
 	print("Characters loaded - Unarmed: ", _unarmed_character != null, ", Armed: ", _armed_character != null)
 
 
+func _create_lightning_particles() -> void:
+	# Create container for all spell effects
+	_spell_effects_container = Node3D.new()
+	_spell_effects_container.name = "SpellEffects"
+	add_child(_spell_effects_container)
+
+	_create_magic_circle()
+	_create_spell_light()
+	_create_spark_particles()
+	_create_rising_sparks()
+	_create_lightning_bolts()
+
+
+func _create_magic_circle() -> void:
+	# Create a glowing magic circle on the ground using a torus mesh
+	_magic_circle = MeshInstance3D.new()
+	_magic_circle.name = "MagicCircle"
+
+	var torus := TorusMesh.new()
+	torus.inner_radius = 1.8
+	torus.outer_radius = 2.0
+	torus.rings = 32
+	torus.ring_segments = 32
+	_magic_circle.mesh = torus
+
+	# Create glowing shader material for neon effect
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, cull_disabled;
+
+uniform vec4 glow_color : source_color = vec4(0.2, 0.5, 1.0, 1.0);
+uniform float glow_intensity : hint_range(0.0, 10.0) = 3.0;
+uniform float pulse_speed : hint_range(0.0, 10.0) = 2.0;
+uniform float time_offset : hint_range(0.0, 6.28) = 0.0;
+
+void fragment() {
+	float pulse = 0.7 + 0.3 * sin(TIME * pulse_speed + time_offset);
+	ALBEDO = glow_color.rgb * glow_intensity * pulse;
+	ALPHA = glow_color.a * pulse;
+	EMISSION = glow_color.rgb * glow_intensity * pulse * 2.0;
+}
+"""
+	var shader_mat := ShaderMaterial.new()
+	shader_mat.shader = shader
+	shader_mat.set_shader_parameter("glow_color", Color(0.2, 0.5, 1.0, 0.9))
+	shader_mat.set_shader_parameter("glow_intensity", 4.0)
+	shader_mat.set_shader_parameter("pulse_speed", 3.0)
+	_magic_circle.material_override = shader_mat
+
+	_magic_circle.position = Vector3(0, 0.05, 0)
+	_magic_circle.rotation_degrees.x = 90  # Lay flat on ground
+	_magic_circle.scale = Vector3(0.01, 0.01, 0.01)  # Start tiny
+	_magic_circle.visible = false
+
+	_spell_effects_container.add_child(_magic_circle)
+
+	# Add inner circle for more detail
+	var inner_circle := MeshInstance3D.new()
+	inner_circle.name = "InnerCircle"
+	var inner_torus := TorusMesh.new()
+	inner_torus.inner_radius = 0.9
+	inner_torus.outer_radius = 1.0
+	inner_torus.rings = 32
+	inner_torus.ring_segments = 32
+	inner_circle.mesh = inner_torus
+
+	var inner_shader_mat := ShaderMaterial.new()
+	inner_shader_mat.shader = shader
+	inner_shader_mat.set_shader_parameter("glow_color", Color(0.4, 0.7, 1.0, 0.8))
+	inner_shader_mat.set_shader_parameter("glow_intensity", 5.0)
+	inner_shader_mat.set_shader_parameter("pulse_speed", 4.0)
+	inner_shader_mat.set_shader_parameter("time_offset", 1.57)  # Offset pulse
+	inner_circle.material_override = inner_shader_mat
+
+	_magic_circle.add_child(inner_circle)
+
+
+func _create_spell_light() -> void:
+	# Create OmniLight3D for blue area illumination
+	_spell_light = OmniLight3D.new()
+	_spell_light.name = "SpellLight"
+	_spell_light.light_color = Color(0.3, 0.5, 1.0)
+	_spell_light.light_energy = 0.0  # Start off
+	_spell_light.omni_range = 8.0
+	_spell_light.omni_attenuation = 1.5
+	_spell_light.shadow_enabled = true
+	_spell_light.position = Vector3(0, 1.5, 0)
+
+	_spell_effects_container.add_child(_spell_light)
+
+
+func _create_spark_particles() -> void:
+	# Core sparks around player body
+	_lightning_particles = GPUParticles3D.new()
+	_lightning_particles.name = "CoreSparks"
+	_lightning_particles.emitting = false
+	_lightning_particles.amount = 80
+	_lightning_particles.lifetime = 0.5
+	_lightning_particles.one_shot = false
+	_lightning_particles.explosiveness = 0.6
+	_lightning_particles.visibility_aabb = AABB(Vector3(-4, -2, -4), Vector3(8, 6, 8))
+
+	var mat := ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	mat.emission_sphere_radius = 0.8
+	mat.direction = Vector3(0, 0, 0)
+	mat.spread = 180.0
+	mat.initial_velocity_min = 3.0
+	mat.initial_velocity_max = 6.0
+	mat.gravity = Vector3(0, 0, 0)
+	mat.scale_min = 0.02
+	mat.scale_max = 0.08
+	mat.damping_min = 2.0
+	mat.damping_max = 4.0
+
+	var gradient := Gradient.new()
+	gradient.add_point(0.0, Color(1.0, 1.0, 1.0, 1.0))
+	gradient.add_point(0.3, Color(0.4, 0.7, 1.0, 1.0))
+	gradient.add_point(1.0, Color(0.2, 0.4, 1.0, 0.0))
+	var gradient_tex := GradientTexture1D.new()
+	gradient_tex.gradient = gradient
+	mat.color_ramp = gradient_tex
+
+	_lightning_particles.process_material = mat
+
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.04
+	mesh.height = 0.08
+	mesh.radial_segments = 4
+	mesh.rings = 2
+
+	var spark_mat := StandardMaterial3D.new()
+	spark_mat.albedo_color = Color(0.6, 0.8, 1.0)
+	spark_mat.emission_enabled = true
+	spark_mat.emission = Color(0.4, 0.6, 1.0)
+	spark_mat.emission_energy_multiplier = 5.0
+	spark_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mesh.material = spark_mat
+
+	_lightning_particles.draw_pass_1 = mesh
+	_lightning_particles.position = Vector3(0, 1.0, 0)
+
+	_spell_effects_container.add_child(_lightning_particles)
+
+
+func _create_rising_sparks() -> void:
+	# Rising sparks from the magic circle
+	_rising_sparks = GPUParticles3D.new()
+	_rising_sparks.name = "RisingSparks"
+	_rising_sparks.emitting = false
+	_rising_sparks.amount = 60
+	_rising_sparks.lifetime = 1.5
+	_rising_sparks.one_shot = false
+	_rising_sparks.explosiveness = 0.1
+	_rising_sparks.visibility_aabb = AABB(Vector3(-4, -1, -4), Vector3(8, 8, 8))
+
+	var mat := ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+	mat.emission_ring_axis = Vector3(0, 1, 0)
+	mat.emission_ring_height = 0.1
+	mat.emission_ring_radius = 1.8
+	mat.emission_ring_inner_radius = 1.6
+	mat.direction = Vector3(0, 1, 0)
+	mat.spread = 15.0
+	mat.initial_velocity_min = 2.0
+	mat.initial_velocity_max = 4.0
+	mat.gravity = Vector3(0, 0.5, 0)  # Slight upward pull
+	mat.scale_min = 0.03
+	mat.scale_max = 0.1
+
+	var gradient := Gradient.new()
+	gradient.add_point(0.0, Color(0.5, 0.8, 1.0, 0.0))
+	gradient.add_point(0.2, Color(0.4, 0.7, 1.0, 1.0))
+	gradient.add_point(0.8, Color(0.3, 0.5, 1.0, 0.8))
+	gradient.add_point(1.0, Color(0.2, 0.3, 1.0, 0.0))
+	var gradient_tex := GradientTexture1D.new()
+	gradient_tex.gradient = gradient
+	mat.color_ramp = gradient_tex
+
+	_rising_sparks.process_material = mat
+
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.05
+	mesh.height = 0.1
+	mesh.radial_segments = 6
+	mesh.rings = 3
+
+	var spark_mat := StandardMaterial3D.new()
+	spark_mat.albedo_color = Color(0.5, 0.7, 1.0)
+	spark_mat.emission_enabled = true
+	spark_mat.emission = Color(0.3, 0.5, 1.0)
+	spark_mat.emission_energy_multiplier = 4.0
+	spark_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mesh.material = spark_mat
+
+	_rising_sparks.draw_pass_1 = mesh
+	_rising_sparks.position = Vector3(0, 0.1, 0)
+
+	_spell_effects_container.add_child(_rising_sparks)
+
+
+func _create_lightning_bolts() -> void:
+	# Lightning bolt streaks
+	_lightning_bolts = GPUParticles3D.new()
+	_lightning_bolts.name = "LightningBolts"
+	_lightning_bolts.emitting = false
+	_lightning_bolts.amount = 20
+	_lightning_bolts.lifetime = 0.3
+	_lightning_bolts.one_shot = false
+	_lightning_bolts.explosiveness = 0.8
+	_lightning_bolts.visibility_aabb = AABB(Vector3(-4, -1, -4), Vector3(8, 6, 8))
+
+	var mat := ParticleProcessMaterial.new()
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	mat.emission_sphere_radius = 1.5
+	mat.direction = Vector3(0, 1, 0)
+	mat.spread = 60.0
+	mat.initial_velocity_min = 8.0
+	mat.initial_velocity_max = 15.0
+	mat.gravity = Vector3(0, 0, 0)
+	mat.scale_min = 0.02
+	mat.scale_max = 0.04
+
+	var gradient := Gradient.new()
+	gradient.add_point(0.0, Color(1.0, 1.0, 1.0, 1.0))
+	gradient.add_point(0.5, Color(0.5, 0.8, 1.0, 1.0))
+	gradient.add_point(1.0, Color(0.2, 0.4, 1.0, 0.0))
+	var gradient_tex := GradientTexture1D.new()
+	gradient_tex.gradient = gradient
+	mat.color_ramp = gradient_tex
+
+	_lightning_bolts.process_material = mat
+
+	# Use stretched quads for bolt-like appearance
+	var mesh := QuadMesh.new()
+	mesh.size = Vector2(0.02, 0.3)
+
+	var bolt_mat := StandardMaterial3D.new()
+	bolt_mat.albedo_color = Color(0.7, 0.9, 1.0)
+	bolt_mat.emission_enabled = true
+	bolt_mat.emission = Color(0.5, 0.7, 1.0)
+	bolt_mat.emission_energy_multiplier = 8.0
+	bolt_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	bolt_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mesh.material = bolt_mat
+
+	_lightning_bolts.draw_pass_1 = mesh
+	_lightning_bolts.position = Vector3(0, 0.5, 0)
+
+	_spell_effects_container.add_child(_lightning_bolts)
+
+
+func _start_spell_effects() -> void:
+	if _spell_tween:
+		_spell_tween.kill()
+
+	_spell_tween = create_tween()
+	_spell_tween.set_parallel(true)
+
+	# Show and animate magic circle
+	_magic_circle.visible = true
+	_magic_circle.scale = Vector3(0.01, 0.01, 0.01)
+	_spell_tween.tween_property(_magic_circle, "scale", Vector3(1.0, 1.0, 1.0), 0.4).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
+	# Animate spell light
+	_spell_light.light_energy = 0.0
+	_spell_tween.tween_property(_spell_light, "light_energy", 6.0, 0.3).set_ease(Tween.EASE_OUT)
+
+	# Start all particles
+	_lightning_particles.emitting = true
+	_rising_sparks.emitting = true
+	_lightning_bolts.emitting = true
+
+	# Rotate magic circle
+	_spell_tween.tween_property(_magic_circle, "rotation_degrees:y", 360.0, 2.0).from(0.0)
+
+
+func _stop_spell_effects() -> void:
+	if _spell_tween:
+		_spell_tween.kill()
+
+	_spell_tween = create_tween()
+	_spell_tween.set_parallel(true)
+
+	# Shrink magic circle
+	_spell_tween.tween_property(_magic_circle, "scale", Vector3(0.01, 0.01, 0.01), 0.3).set_ease(Tween.EASE_IN)
+	_spell_tween.tween_callback(func(): _magic_circle.visible = false).set_delay(0.3)
+
+	# Fade out spell light
+	_spell_tween.tween_property(_spell_light, "light_energy", 0.0, 0.4).set_ease(Tween.EASE_IN)
+
+	# Stop particles
+	_lightning_particles.emitting = false
+	_rising_sparks.emitting = false
+	_lightning_bolts.emitting = false
+
+
 func _get_unarmed_config() -> Dictionary:
 	return {
 		"idle": ["Idle", true],
@@ -155,6 +465,7 @@ func _get_armed_config() -> Dictionary:
 		"attack2": ["Attack2", false],
 		"block": ["Block", true],
 		"sheath": ["Sheath", false],
+		"spell_cast": ["SpellCast", false],
 	}
 
 
@@ -351,6 +662,9 @@ func _on_animation_finished(anim_name: StringName) -> void:
 			is_transitioning = true
 			_current_anim_player.play(&"unarmed/ActionToIdle")
 			_current_anim = &"unarmed/ActionToIdle"
+	if is_casting:
+		is_casting = false
+		_stop_spell_effects()
 	if is_transitioning:
 		# Transition animation finished
 		if anim_name == &"unarmed/ActionToIdle" or anim_name == &"unarmed/IdleToFight":
@@ -377,7 +691,7 @@ func _update_animation(input_dir: Vector2) -> void:
 	if _current_anim_player == null:
 		return
 
-	if is_attacking or is_sheathing or is_transitioning:
+	if is_attacking or is_sheathing or is_transitioning or is_casting:
 		return
 
 	var prefix: String = _get_current_mode_prefix()
@@ -502,6 +816,27 @@ func _do_attack() -> void:
 			is_attacking = false
 
 
+func _do_spell_cast() -> void:
+	# Only allow spell cast in armed mode
+	if combat_mode != CombatMode.ARMED:
+		return
+	if is_casting or is_attacking or _attack_cooldown > 0:
+		return
+
+	is_casting = true
+
+	# Start all spell effects
+	_start_spell_effects()
+
+	# Play spell cast animation
+	if _current_anim_player.has_animation(&"armed/SpellCast"):
+		_current_anim_player.play(&"armed/SpellCast")
+		_current_anim = &"armed/SpellCast"
+	else:
+		is_casting = false
+		_stop_spell_effects()
+
+
 func _input(event: InputEvent) -> void:
 	# Quit with Q key
 	if event is InputEventKey and event.pressed and event.keycode == KEY_Q:
@@ -539,6 +874,10 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
 		if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 			is_blocking = event.pressed
+
+	# Spell cast with C key or gamepad B button (armed mode only)
+	if event.is_action_pressed(&"spell_cast"):
+		_do_spell_cast()
 
 	# Mouse look
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
