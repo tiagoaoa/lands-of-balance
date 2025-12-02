@@ -1,8 +1,6 @@
 # Platformer 3D
 
-3D Platformer demo using a
-[`CharacterBody3D`](https://docs.godotengine.org/en/latest/classes/class_characterbody3d.html).
-It uses similar code to the 2D platformer, but implemented in 3D.
+3D Medieval GAme
 
 Language: GDScript
 
