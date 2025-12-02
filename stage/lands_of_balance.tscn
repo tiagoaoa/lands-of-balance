@@ -1,14 +1,17 @@
-[gd_scene load_steps=43 format=4]
+[gd_scene load_steps=37 format=4 uid="uid://b2lcb4fy8his1"]
 
-[ext_resource type="Script" path="res://stage/stage.gd" id="1_stage"]
-[ext_resource type="Script" path="res://stage/village_decorator.gd" id="2_decorator"]
-[ext_resource type="Script" path="res://stage/lighting_manager.gd" id="2_js6ng"]
-[ext_resource type="Script" path="res://stage/realistic_castle.gd" id="3_castle"]
-[ext_resource type="Texture2D" path="res://assets/textures/Ground037_1K-JPG_Color.jpg" id="4_js6ng"]
-[ext_resource type="Texture2D" path="res://assets/textures/Ground037_1K-JPG_AmbientOcclusion.jpg" id="5_wdnaj"]
-[ext_resource type="Texture2D" path="res://assets/textures/Ground037_1K-JPG_NormalGL.jpg" id="6_grb1b"]
-[ext_resource type="Texture2D" path="res://assets/textures/Ground037_1K-JPG_Roughness.jpg" id="7_5v762"]
-[ext_resource type="PackedScene" path="res://assets/realistic_grass.glb" id="10_wdnaj"]
+[ext_resource type="Script" uid="uid://vw47tquoshc7" path="res://stage/stage.gd" id="1_stage"]
+[ext_resource type="Script" uid="uid://cuveftns1euyj" path="res://stage/village_decorator.gd" id="2_decorator"]
+[ext_resource type="Script" uid="uid://c5njnhk8xqah6" path="res://stage/lighting_manager.gd" id="2_js6ng"]
+[ext_resource type="Script" uid="uid://dyklxrtfeopq3" path="res://stage/realistic_castle.gd" id="3_castle"]
+[ext_resource type="Texture2D" uid="uid://d1a860c4rdhny" path="res://assets/textures/Ground037_1K-JPG_Color.jpg" id="4_js6ng"]
+[ext_resource type="Texture2D" uid="uid://qwev4imcwa6t" path="res://assets/textures/Ground037_1K-JPG_AmbientOcclusion.jpg" id="5_wdnaj"]
+[ext_resource type="Texture2D" uid="uid://btgo46veltw5p" path="res://assets/textures/Ground037_1K-JPG_NormalGL.jpg" id="6_grb1b"]
+[ext_resource type="Texture2D" uid="uid://timtsnrreaat" path="res://assets/textures/Ground037_1K-JPG_Roughness.jpg" id="7_5v762"]
+[ext_resource type="PackedScene" uid="uid://dukdx43suoeqp" path="res://assets/bunratty_castle.glb" id="10_grb1b"]
+[ext_resource type="PackedScene" uid="uid://cqorrhm68dacv" path="res://assets/realistic_grass.glb" id="10_wdnaj"]
+[ext_resource type="Script" uid="uid://cqt5ps4836h1y" path="res://stage/village_loader.gd" id="11_village"]
+[ext_resource type="PackedScene" uid="uid://dj6te728xfgwg" path="res://assets/village_of_eights.glb" id="13_ropnn"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_15kie"]
 sky_top_color = Color(0.15, 0.18, 0.25, 1)
@@ -77,51 +80,13 @@ albedo_color = Color(0.2, 0.4, 0.6, 0.7)
 metallic = 0.1
 roughness = 0.1
 
-[sub_resource type="StandardMaterial3D" id="mat_path"]
-albedo_color = Color(0.55, 0.45, 0.3, 1)
-roughness = 0.95
-
-[sub_resource type="StandardMaterial3D" id="mat_wood"]
-albedo_color = Color(0.45, 0.32, 0.2, 1)
-roughness = 0.85
-
-[sub_resource type="StandardMaterial3D" id="mat_thatch"]
-albedo_color = Color(0.6, 0.5, 0.3, 1)
-roughness = 0.95
-
 [sub_resource type="StandardMaterial3D" id="mat_stone"]
 albedo_color = Color(0.45, 0.45, 0.5, 1)
 roughness = 0.85
 
-[sub_resource type="StandardMaterial3D" id="mat_roof"]
-albedo_color = Color(0.5, 0.35, 0.25, 1)
-roughness = 0.9
-
-[sub_resource type="StandardMaterial3D" id="mat_scorched"]
-albedo_color = Color(0.2, 0.15, 0.12, 1)
+[sub_resource type="StandardMaterial3D" id="mat_path"]
+albedo_color = Color(0.55, 0.45, 0.3, 1)
 roughness = 0.95
-
-[sub_resource type="StandardMaterial3D" id="mat_grass_dark"]
-albedo_color = Color(0.2, 0.35, 0.12, 1)
-roughness = 0.9
-
-[sub_resource type="StandardMaterial3D" id="mat_grass"]
-albedo_color = Color(0.28, 0.45, 0.18, 1)
-roughness = 0.9
-
-[sub_resource type="StandardMaterial3D" id="mat_mountain"]
-albedo_color = Color(0.4, 0.38, 0.42, 1)
-roughness = 0.9
-
-[sub_resource type="StandardMaterial3D" id="mat_snow"]
-albedo_color = Color(0.95, 0.95, 0.98, 1)
-roughness = 0.8
-
-[sub_resource type="StandardMaterial3D" id="mat_fire"]
-albedo_color = Color(1, 0.4, 0.1, 1)
-emission_enabled = true
-emission = Color(1, 0.5, 0.2, 1)
-emission_energy_multiplier = 2.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_16tto"]
 resource_name = "grass"
@@ -311,7 +276,7 @@ script = ExtResource("2_js6ng")
 environment = SubResource("Environment_wdnaj")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.70709115, 0.18298607, -0.6829132, 0, 0.96578526, 0.25878134, 0.70709115, -0.18298607, 0.6829132, 30, 50, 30)
+transform = Transform3D(0.5262584, 0.22008015, -0.82135063, -9.642972e-10, 0.9659259, 0.25881895, 0.85032475, -0.13620564, 0.5083266, 81.52707, 69.04639, 59.595867)
 light_color = Color(0.6, 0.65, 0.75, 1)
 light_energy = 0.375
 light_indirect_energy = 0.2
@@ -322,9 +287,9 @@ shadow_opacity = 0.8
 [node name="Ground" type="Node3D" parent="."]
 
 [node name="MainGround" type="CSGBox3D" parent="Ground"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+transform = Transform3D(0.9999987, -7.0950384e-11, -0.0016231555, 7.0950384e-11, 1, -5.731884e-14, 0.0016231555, -5.731884e-14, 0.9999987, -17.700104, -0.5, 15.765869)
 use_collision = true
-size = Vector3(300, 1, 300)
+size = Vector3(419.32623, 1, 331.53174)
 material = SubResource("StandardMaterial3D_0t235")
 
 [node name="River" type="Node3D" parent="."]
@@ -358,103 +323,8 @@ outline_size = 4
 
 [node name="VillageOfEights" type="Node3D" parent="."]
 
-[node name="VillageGround" type="CSGBox3D" parent="VillageOfEights"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 0)
-use_collision = true
-size = Vector3(40, 0.3, 40)
-material = SubResource("mat_path")
-
-[node name="House1Base" type="CSGBox3D" parent="VillageOfEights"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 2, -8)
-use_collision = true
-size = Vector3(6, 4, 5)
-material = SubResource("mat_wood")
-
-[node name="House1Roof" type="CSGPolygon3D" parent="VillageOfEights"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 4, -10.6)
-polygon = PackedVector2Array(-3.5, 0, 0, 2.5, 3.5, 0)
-depth = 5.4
-material = SubResource("mat_thatch")
-
-[node name="House2Base" type="CSGBox3D" parent="VillageOfEights"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 2, -12)
-use_collision = true
-size = Vector3(5, 4, 5)
-material = SubResource("mat_wood")
-
-[node name="House2Roof" type="CSGPolygon3D" parent="VillageOfEights"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 4, -14.6)
-polygon = PackedVector2Array(-3, 0, 0, 2, 3, 0)
-depth = 5.2
-material = SubResource("mat_thatch")
-
-[node name="House3Base" type="CSGBox3D" parent="VillageOfEights"]
-transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 8, 2, -6)
-use_collision = true
-size = Vector3(5, 4, 5)
-material = SubResource("mat_wood")
-
-[node name="House3Roof" type="CSGPolygon3D" parent="VillageOfEights"]
-transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 8, 4, -8.6)
-polygon = PackedVector2Array(-3, 0, 0, 2, 3, 0)
-depth = 5.2
-material = SubResource("mat_thatch")
-
-[node name="House4Base" type="CSGBox3D" parent="VillageOfEights"]
-transform = Transform3D(0.707, 0, 0.707, 0, 1, 0, -0.707, 0, 0.707, 12, 2, 4)
-use_collision = true
-size = Vector3(5, 4, 5)
-material = SubResource("mat_wood")
-
-[node name="House4Roof" type="CSGPolygon3D" parent="VillageOfEights"]
-transform = Transform3D(0.707, 0, 0.707, 0, 1, 0, -0.707, 0, 0.707, 12, 4, 1.4)
-polygon = PackedVector2Array(-3, 0, 0, 2, 3, 0)
-depth = 5.2
-material = SubResource("mat_thatch")
-
-[node name="House5Base" type="CSGBox3D" parent="VillageOfEights"]
-transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, -8, 2, 10)
-use_collision = true
-size = Vector3(5, 4, 5)
-material = SubResource("mat_wood")
-
-[node name="House5Roof" type="CSGPolygon3D" parent="VillageOfEights"]
-transform = Transform3D(0.866, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866, -8, 4, 7.4)
-polygon = PackedVector2Array(-3, 0, 0, 2, 3, 0)
-depth = 5.2
-material = SubResource("mat_thatch")
-
-[node name="KeeperSeat" type="CSGBox3D" parent="VillageOfEights"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
-use_collision = true
-size = Vector3(8, 5, 8)
-material = SubResource("mat_stone")
-
-[node name="KeeperRoof" type="CSGPolygon3D" parent="VillageOfEights"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5, -4.5)
-polygon = PackedVector2Array(-5, 0, 0, 4, 5, 0)
-depth = 9.0
-material = SubResource("mat_roof")
-
-[node name="FirePit" type="CSGCylinder3D" parent="VillageOfEights"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 6)
-use_collision = true
-radius = 1.5
-height = 0.6
-material = SubResource("mat_scorched")
-
-[node name="Well" type="CSGCylinder3D" parent="VillageOfEights"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.6, -2)
-use_collision = true
-radius = 1.2
-height = 1.2
-material = SubResource("mat_stone")
-
-[node name="WellInner" type="CSGCylinder3D" parent="VillageOfEights"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.7, -2)
-radius = 0.8
-height = 1.4
-material = SubResource("mat_water")
+[node name="VillageLoader" type="Node3D" parent="VillageOfEights"]
+script = ExtResource("11_village")
 
 [node name="VillageLabel" type="Label3D" parent="VillageOfEights"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12, 0)
@@ -466,77 +336,17 @@ outline_size = 6
 [node name="CommonGround" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 70)
 
-[node name="ScorchedStone" type="CSGCylinder3D" parent="CommonGround"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
-use_collision = true
-radius = 20.0
-height = 0.4
-material = SubResource("mat_scorched")
-
-[node name="ScorchedRing" type="CSGTorus3D" parent="CommonGround"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
-inner_radius = 18.0
-outer_radius = 22.0
-material = SubResource("mat_stone_dark")
-
-[node name="CommonLabel" type="Label3D" parent="CommonGround"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)
-text = "Common Ground
-(Scorched Stone)"
-font_size = 48
-outline_size = 6
-
 [node name="TowerOfHakutnas" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -80, 0, -60)
 
-[node name="TowerBase" type="CSGBox3D" parent="TowerOfHakutnas"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
-use_collision = true
-size = Vector3(30, 0.7, 30)
-material = SubResource("mat_stone")
-
-[node name="Tower" type="CSGCylinder3D" parent="TowerOfHakutnas"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 20, 0)
-use_collision = true
-radius = 6.0
-height = 40.0
-material = SubResource("mat_stone")
-
-[node name="TowerTop" type="CSGCylinder3D" parent="TowerOfHakutnas"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 42, 0)
-use_collision = true
-radius = 7.0
-height = 4.0
-material = SubResource("mat_stone_dark")
-
-[node name="TowerRoof" type="CSGCylinder3D" parent="TowerOfHakutnas"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 48, 0)
-radius = 8.0
-height = 8.0
-cone = true
-material = SubResource("mat_roof")
-
-[node name="TrainingRing" type="CSGCylinder3D" parent="TowerOfHakutnas"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 20)
-use_collision = true
-radius = 10.0
-height = 0.3
-material = SubResource("mat_path")
-
-[node name="Wall1" type="CSGBox3D" parent="TowerOfHakutnas"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1.5, 0)
-use_collision = true
-size = Vector3(0.8, 3, 30)
-material = SubResource("mat_stone")
-
 [node name="Wall2" type="CSGBox3D" parent="TowerOfHakutnas"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 1.5, 0)
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 100, -15, -30)
 use_collision = true
 size = Vector3(0.8, 3, 30)
 material = SubResource("mat_stone")
 
 [node name="TowerLabel" type="Label3D" parent="TowerOfHakutnas"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 58, 0)
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 100, -15, -30)
 text = "Tower of Hakutnas
 (Training Grounds)"
 font_size = 48
@@ -545,100 +355,8 @@ outline_size = 6
 [node name="RealmOfHudson" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, -50)
 
-[node name="RealmGround" type="CSGBox3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
-use_collision = true
-size = Vector3(50, 0.4, 50)
-material = SubResource("mat_grass_dark")
-
-[node name="Castle" type="CSGBox3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
-use_collision = true
-size = Vector3(16, 16, 16)
-material = SubResource("mat_stone")
-
-[node name="CastleTower1" type="CSGCylinder3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 12, -10)
-use_collision = true
-radius = 3.5
-height = 24.0
-material = SubResource("mat_stone")
-
-[node name="CastleTower1Roof" type="CSGCylinder3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 27, -10)
-radius = 4.0
-height = 6.0
-cone = true
-material = SubResource("mat_roof")
-
-[node name="CastleTower2" type="CSGCylinder3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 12, -10)
-use_collision = true
-radius = 3.5
-height = 24.0
-material = SubResource("mat_stone")
-
-[node name="CastleTower2Roof" type="CSGCylinder3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 27, -10)
-radius = 4.0
-height = 6.0
-cone = true
-material = SubResource("mat_roof")
-
-[node name="CastleTower3" type="CSGCylinder3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 12, 10)
-use_collision = true
-radius = 3.5
-height = 24.0
-material = SubResource("mat_stone")
-
-[node name="CastleTower3Roof" type="CSGCylinder3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 27, 10)
-radius = 4.0
-height = 6.0
-cone = true
-material = SubResource("mat_roof")
-
-[node name="CastleTower4" type="CSGCylinder3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 12, 10)
-use_collision = true
-radius = 3.5
-height = 24.0
-material = SubResource("mat_stone")
-
-[node name="CastleTower4Roof" type="CSGCylinder3D" parent="RealmOfHudson"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 27, 10)
-radius = 4.0
-height = 6.0
-cone = true
-material = SubResource("mat_roof")
-
 [node name="Fields" type="Node3D" parent="RealmOfHudson"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 0, 15)
-
-[node name="Field1" type="CSGBox3D" parent="RealmOfHudson/Fields"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
-use_collision = true
-size = Vector3(6, 0.2, 6)
-material = SubResource("mat_grass")
-
-[node name="Field2" type="CSGBox3D" parent="RealmOfHudson/Fields"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.2, 0)
-use_collision = true
-size = Vector3(6, 0.2, 6)
-material = SubResource("mat_grass")
-
-[node name="Field3" type="CSGBox3D" parent="RealmOfHudson/Fields"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 7)
-use_collision = true
-size = Vector3(6, 0.2, 6)
-material = SubResource("mat_grass")
-
-[node name="Field4" type="CSGBox3D" parent="RealmOfHudson/Fields"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0.2, 7)
-use_collision = true
-size = Vector3(6, 0.2, 6)
-material = SubResource("mat_grass")
 
 [node name="FieldsLabel" type="Label3D" parent="RealmOfHudson/Fields"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 4, 3)
@@ -672,12 +390,6 @@ use_collision = true
 size = Vector3(5, 0.25, 70)
 material = SubResource("mat_path")
 
-[node name="LongRoadLabel" type="Label3D" parent="Roads"]
-transform = Transform3D(0.707, 0, -0.707, 0, 1, 0, 0.707, 0, 0.707, -40, 2, -30)
-text = "The Long Road"
-font_size = 24
-outline_size = 4
-
 [node name="TradeRoadLabel" type="Label3D" parent="Roads"]
 transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 40, 2, -25)
 text = "Trade Road"
@@ -687,26 +399,8 @@ outline_size = 4
 [node name="TheHills" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0, 20)
 
-[node name="Hill1" type="CSGSphere3D" parent="TheHills"]
-transform = Transform3D(1, 0.4, 0, 0, 0.4, 0, 0, 0, 1, 0, 0, 0)
-use_collision = true
-radius = 12.0
-material = SubResource("mat_grass")
-
-[node name="Hill2" type="CSGSphere3D" parent="TheHills"]
-transform = Transform3D(1, 0.35, 0, 0, 0.35, 0, 0, 0, 1, 18, 0, 8)
-use_collision = true
-radius = 10.0
-material = SubResource("mat_grass")
-
-[node name="Hill3" type="CSGSphere3D" parent="TheHills"]
-transform = Transform3D(1, 0.45, 0, 0, 0.45, 0, 0, 0, 1, -12, 0, 12)
-use_collision = true
-radius = 11.0
-material = SubResource("mat_grass")
-
 [node name="HillsLabel" type="Label3D" parent="TheHills"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 100, -15, -30)
 text = "The Hills"
 font_size = 36
 outline_size = 5
@@ -714,77 +408,14 @@ outline_size = 5
 [node name="BurningPeaks" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -120, 0, 0)
 
-[node name="Mountain1" type="CSGCylinder3D" parent="BurningPeaks"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 0)
-use_collision = true
-radius = 25.0
-height = 50.0
-cone = true
-material = SubResource("mat_mountain")
-
-[node name="Mountain1Snow" type="CSGCylinder3D" parent="BurningPeaks"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 45, 0)
-radius = 8.0
-height = 10.0
-cone = true
-material = SubResource("mat_snow")
-
-[node name="Mountain2" type="CSGCylinder3D" parent="BurningPeaks"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 20, 25)
-use_collision = true
-radius = 20.0
-height = 40.0
-cone = true
-material = SubResource("mat_mountain")
-
-[node name="Mountain2Snow" type="CSGCylinder3D" parent="BurningPeaks"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 38, 25)
-radius = 6.0
-height = 8.0
-cone = true
-material = SubResource("mat_snow")
-
-[node name="Mountain3" type="CSGCylinder3D" parent="BurningPeaks"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 18, -20)
-use_collision = true
-radius = 18.0
-height = 36.0
-cone = true
-material = SubResource("mat_mountain")
-
-[node name="Mountain4" type="CSGCylinder3D" parent="BurningPeaks"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 15, -15)
-use_collision = true
-radius = 15.0
-height = 30.0
-cone = true
-material = SubResource("mat_mountain")
-
 [node name="PeaksLabel" type="Label3D" parent="BurningPeaks"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 55, 0)
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 100, -15, -30)
 text = "The Burning Peaks"
 font_size = 48
 outline_size = 6
 
 [node name="FireCreatureLair" type="Node3D" parent="BurningPeaks"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 10, 5)
-
-[node name="LairCave" type="CSGSphere3D" parent="BurningPeaks/FireCreatureLair"]
-use_collision = true
-radius = 8.0
-material = SubResource("mat_stone_dark")
-
-[node name="FireGlow" type="CSGSphere3D" parent="BurningPeaks/FireCreatureLair"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5)
-radius = 3.0
-material = SubResource("mat_fire")
-
-[node name="LairLabel" type="Label3D" parent="BurningPeaks/FireCreatureLair"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12, 0)
-modulate = Color(1, 0.5, 0.3, 1)
-text = "Lair of the
-Fire Creature"
-outline_size = 4
 
 [node name="VillageDecorator" type="Node3D" parent="."]
 script = ExtResource("2_decorator")
@@ -810,8 +441,17 @@ multimesh = SubResource("MultiMesh_grb1b")
 cast_shadow = 0
 multimesh = SubResource("MultiMesh_5v762")
 
-[node name="Sketchfab_Scene" type="Node3D" parent="." instance=ExtResource("10_wdnaj")]
+[node name="Sketchfab_Scene" parent="." instance=ExtResource("10_wdnaj")]
 transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -7.9872665, -0.25731087, -19.308586)
 
-[node name="Sketchfab_Scene2" type="Node3D" parent="." instance=ExtResource("10_wdnaj")]
+[node name="Sketchfab_Scene2" parent="." instance=ExtResource("10_wdnaj")]
 transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 26.723375, -0.042243004, 11.732845)
+
+[node name="Sketchfab_Scene3" parent="." instance=ExtResource("10_grb1b")]
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 120.95279, 138.71138, 228.59973)
+
+[node name="Sketchfab_Scene4" parent="." instance=ExtResource("10_grb1b")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 228.75511, -19.162258, 414.59692)
+
+[node name="Sketchfab_Scene5" parent="." instance=ExtResource("13_ropnn")]
+transform = Transform3D(4.9968157, 0, -0.17842203, 0, 5, 0, 0.17842203, 0, 4.9968157, 100, -15, -30)

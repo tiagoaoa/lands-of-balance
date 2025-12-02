@@ -10,7 +10,9 @@ const GRAVEYARD_KIT_PATH := "res://assets/medieval_village/graveyard_kit/Models/
 var _loaded_assets: Dictionary = {}
 
 func _ready() -> void:
-	call_deferred("_decorate_world")
+	# Disabled - medieval_village assets were removed
+	# call_deferred("_decorate_world")
+	pass
 
 func _decorate_world() -> void:
 	_add_village_buildings()

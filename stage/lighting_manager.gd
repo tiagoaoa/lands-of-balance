@@ -5,7 +5,7 @@ extends Node
 
 enum TimeOfDay { DAY, NIGHT }
 
-@export var time_of_day: TimeOfDay = TimeOfDay.NIGHT:
+@export var time_of_day: TimeOfDay = TimeOfDay.DAY:
 	set(value):
 		time_of_day = value
 		if is_inside_tree():

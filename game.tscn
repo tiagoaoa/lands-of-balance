@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://nkgitqhlqrsy"]
 
-[ext_resource type="PackedScene" path="res://stage/lands_of_balance.tscn" id="1_lands"]
+[ext_resource type="PackedScene" uid="uid://b2lcb4fy8his1" path="res://stage/lands_of_balance.tscn" id="1_lands"]
 [ext_resource type="PackedScene" uid="uid://c0q5hsswj8dqf" path="res://player/player.tscn" id="2_player"]
 [ext_resource type="PackedScene" uid="uid://7bwmwbaeosl3" path="res://touch_screen_ui/touch_screen_ui.tscn" id="3_touch"]
 [ext_resource type="PackedScene" path="res://ui/minimap.tscn" id="4_minimap"]
@@ -8,6 +8,7 @@
 [node name="Game" type="Node3D"]
 
 [node name="LandsOfBalance" parent="." instance=ExtResource("1_lands")]
+transform = Transform3D(0.99989533, 6.324284e-10, 0.014468275, -6.324284e-10, 1, -4.5750855e-12, -0.014468275, -4.5750855e-12, 0.99989533, 11.018539, 0, -27.122612)
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 10)

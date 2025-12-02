@@ -5,6 +5,9 @@ extends CharacterBody3D
 ## Uses FBX character models with Mixamo animations.
 ## Supports armed (Paladin with sword & shield) and unarmed (Y Bot) combat modes.
 
+# Lightning addon preloads
+const Lightning3DBranchedClass = preload("res://addons/lightning/generators/Lightning3DBranched.gd")
+
 const MAX_SPEED: float = 5.0
 const RUN_SPEED: float = 8.0
 const ACCEL: float = 12.0
@@ -72,7 +75,7 @@ var is_casting: bool = false
 var attack_combo: int = 0
 var _attack_cooldown: float = 0.0
 
-# Spell VFX components
+# Spell VFX components (ProceduralThunderChannel)
 var _spell_effects_container: Node3D
 var _lightning_particles: GPUParticles3D
 var _rising_sparks: GPUParticles3D
@@ -80,6 +83,20 @@ var _magic_circle: MeshInstance3D
 var _spell_light: OmniLight3D
 var _lightning_bolts: GPUParticles3D
 var _spell_tween: Tween
+# Enhanced spell VFX
+var _spell_time: float = 0.0  # For sin() flicker calculations
+var _lightning_bolts_3d: Array = []  # Lightning3DBranched instances from addon
+var _character_aura_material: ShaderMaterial  # Fresnel aura shader
+var _original_character_materials: Array[Dictionary] = []  # Store {mesh, material} pairs
+const NUM_LIGHTNING_BOLTS: int = 6  # Number of 3D lightning bolts
+# Audio system placeholders (assign audio streams in inspector or load at runtime)
+var _audio_scream: AudioStreamPlayer3D  # Initial power-up scream
+var _audio_static: AudioStreamPlayer3D  # Looping electric static
+var _audio_discharge: AudioStreamPlayer3D  # One-shot discharge on spell end
+# Force Field / Bubble Shield (V2 Asset Rich)
+var _force_field_sphere: MeshInstance3D  # Bubble shield around character
+var _force_field_light: OmniLight3D  # Constant light inside force field
+var _force_field_material: ShaderMaterial  # Bubble shader with noise distortion
 
 @onready var initial_position := position
 @onready var gravity: Vector3 = ProjectSettings.get_setting("physics/3d/default_gravity") * \
@@ -141,16 +158,20 @@ func _create_characters() -> void:
 
 
 func _create_lightning_particles() -> void:
-	# Create container for all spell effects
+	# Create container for all spell effects (ProceduralThunderChannel)
 	_spell_effects_container = Node3D.new()
 	_spell_effects_container.name = "SpellEffects"
 	add_child(_spell_effects_container)
 
 	_create_magic_circle()
+	_create_force_field_sphere()  # V2: Bubble shield
 	_create_spell_light()
 	_create_spark_particles()
 	_create_rising_sparks()
 	_create_lightning_bolts()
+	_create_character_aura_shader()
+	_create_procedural_lightning_bolts()
+	_create_spell_audio_system()
 
 
 func _create_magic_circle() -> void:
@@ -218,6 +239,111 @@ void fragment() {
 	_magic_circle.add_child(inner_circle)
 
 
+func _create_force_field_sphere() -> void:
+	# Create a protective bubble/force field shield around the character (V2 Asset Rich)
+	_force_field_sphere = MeshInstance3D.new()
+	_force_field_sphere.name = "ForceFieldSphere"
+
+	var sphere := SphereMesh.new()
+	sphere.radius = 1.8
+	sphere.height = 3.6
+	sphere.radial_segments = 32
+	sphere.rings = 16
+	_force_field_sphere.mesh = sphere
+
+	# Create bubble/force field shader with Fresnel edge glow and noise distortion
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode blend_add, depth_draw_opaque, cull_front, unshaded;
+
+uniform vec4 bubble_color : source_color = vec4(0.0, 0.8, 1.0, 0.3);
+uniform float fresnel_power : hint_range(0.5, 8.0) = 3.0;
+uniform float edge_intensity : hint_range(0.0, 5.0) = 2.5;
+uniform float pulse_speed : hint_range(0.0, 10.0) = 2.0;
+uniform float distortion_scale : hint_range(0.0, 2.0) = 0.5;
+uniform float distortion_speed : hint_range(0.0, 5.0) = 1.0;
+
+// Simple noise function
+float noise(vec3 p) {
+	return fract(sin(dot(p, vec3(12.9898, 78.233, 45.543))) * 43758.5453);
+}
+
+float smooth_noise(vec3 p) {
+	vec3 i = floor(p);
+	vec3 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+
+	float n000 = noise(i);
+	float n001 = noise(i + vec3(0.0, 0.0, 1.0));
+	float n010 = noise(i + vec3(0.0, 1.0, 0.0));
+	float n011 = noise(i + vec3(0.0, 1.0, 1.0));
+	float n100 = noise(i + vec3(1.0, 0.0, 0.0));
+	float n101 = noise(i + vec3(1.0, 0.0, 1.0));
+	float n110 = noise(i + vec3(1.0, 1.0, 0.0));
+	float n111 = noise(i + vec3(1.0, 1.0, 1.0));
+
+	float nx00 = mix(n000, n100, f.x);
+	float nx01 = mix(n001, n101, f.x);
+	float nx10 = mix(n010, n110, f.x);
+	float nx11 = mix(n011, n111, f.x);
+
+	float nxy0 = mix(nx00, nx10, f.y);
+	float nxy1 = mix(nx01, nx11, f.y);
+
+	return mix(nxy0, nxy1, f.z);
+}
+
+void fragment() {
+	// Calculate Fresnel effect for edge glow
+	float fresnel = pow(1.0 - abs(dot(NORMAL, VIEW)), fresnel_power);
+
+	// Animated noise for bubble distortion effect
+	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float noise_val = smooth_noise(world_pos * distortion_scale + TIME * distortion_speed);
+	float noise_val2 = smooth_noise(world_pos * distortion_scale * 0.5 - TIME * distortion_speed * 0.7);
+
+	// Pulsing effect
+	float pulse = 0.7 + 0.3 * sin(TIME * pulse_speed);
+
+	// Combine effects
+	float intensity = fresnel * edge_intensity * pulse;
+	intensity += (noise_val * 0.3 + noise_val2 * 0.2) * fresnel;
+
+	ALBEDO = bubble_color.rgb * intensity;
+	ALPHA = bubble_color.a * intensity * 0.8;
+	EMISSION = bubble_color.rgb * intensity * 1.5;
+}
+"""
+	_force_field_material = ShaderMaterial.new()
+	_force_field_material.shader = shader
+	_force_field_material.set_shader_parameter("bubble_color", Color(0.0, 0.9, 1.0, 0.4))
+	_force_field_material.set_shader_parameter("fresnel_power", 3.0)
+	_force_field_material.set_shader_parameter("edge_intensity", 2.5)
+	_force_field_material.set_shader_parameter("pulse_speed", 3.0)
+	_force_field_material.set_shader_parameter("distortion_scale", 0.8)
+	_force_field_material.set_shader_parameter("distortion_speed", 1.2)
+	_force_field_sphere.material_override = _force_field_material
+
+	_force_field_sphere.position = Vector3(0, 1.0, 0)  # Center on character
+	_force_field_sphere.scale = Vector3(0.01, 0.01, 0.01)  # Start tiny
+	_force_field_sphere.visible = false
+
+	_spell_effects_container.add_child(_force_field_sphere)
+
+	# Add constant light inside the force field (non-flickering)
+	_force_field_light = OmniLight3D.new()
+	_force_field_light.name = "ForceFieldLight"
+	_force_field_light.light_color = Color(0.0, 1.0, 1.0)  # Cyan
+	_force_field_light.light_energy = 0.0  # Start off
+	_force_field_light.omni_range = 4.0
+	_force_field_light.omni_attenuation = 1.2
+	_force_field_light.shadow_enabled = false
+	_force_field_light.position = Vector3(0, 1.0, 0)
+
+	_spell_effects_container.add_child(_force_field_light)
+
+
 func _create_spell_light() -> void:
 	# Create OmniLight3D for blue area illumination
 	_spell_light = OmniLight3D.new()
@@ -233,11 +359,11 @@ func _create_spell_light() -> void:
 
 
 func _create_spark_particles() -> void:
-	# Core sparks around player body
+	# Core sparks around player body (ProceduralThunderChannel SparkShower)
 	_lightning_particles = GPUParticles3D.new()
 	_lightning_particles.name = "CoreSparks"
 	_lightning_particles.emitting = false
-	_lightning_particles.amount = 80
+	_lightning_particles.amount = 150  # Increased per JSON spec
 	_lightning_particles.lifetime = 0.5
 	_lightning_particles.one_shot = false
 	_lightning_particles.explosiveness = 0.6
@@ -256,10 +382,11 @@ func _create_spark_particles() -> void:
 	mat.damping_min = 2.0
 	mat.damping_max = 4.0
 
+	# Updated gradient per JSON spec
 	var gradient := Gradient.new()
-	gradient.add_point(0.0, Color(1.0, 1.0, 1.0, 1.0))
-	gradient.add_point(0.3, Color(0.4, 0.7, 1.0, 1.0))
-	gradient.add_point(1.0, Color(0.2, 0.4, 1.0, 0.0))
+	gradient.add_point(0.0, Color(0.9, 0.95, 1.0, 1.0))  # Near-white start
+	gradient.add_point(0.5, Color(0.3, 0.6, 1.0, 1.0))   # Blue mid
+	gradient.add_point(1.0, Color(0.1, 0.3, 1.0, 0.0))   # Dark blue fade
 	var gradient_tex := GradientTexture1D.new()
 	gradient_tex.gradient = gradient
 	mat.color_ramp = gradient_tex
@@ -272,12 +399,14 @@ func _create_spark_particles() -> void:
 	mesh.radial_segments = 4
 	mesh.rings = 2
 
+	# Additive blend for glow effect
 	var spark_mat := StandardMaterial3D.new()
-	spark_mat.albedo_color = Color(0.6, 0.8, 1.0)
+	spark_mat.albedo_color = Color(0.9, 0.95, 1.0)
 	spark_mat.emission_enabled = true
 	spark_mat.emission = Color(0.4, 0.6, 1.0)
-	spark_mat.emission_energy_multiplier = 5.0
-	spark_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	spark_mat.emission_energy_multiplier = 6.0
+	spark_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD  # Additive blending
+	spark_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mesh.material = spark_mat
 
 	_lightning_particles.draw_pass_1 = mesh
@@ -328,12 +457,14 @@ func _create_rising_sparks() -> void:
 	mesh.radial_segments = 6
 	mesh.rings = 3
 
+	# Additive blend for glow effect
 	var spark_mat := StandardMaterial3D.new()
 	spark_mat.albedo_color = Color(0.5, 0.7, 1.0)
 	spark_mat.emission_enabled = true
 	spark_mat.emission = Color(0.3, 0.5, 1.0)
-	spark_mat.emission_energy_multiplier = 4.0
-	spark_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	spark_mat.emission_energy_multiplier = 5.0
+	spark_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD  # Additive blending
+	spark_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mesh.material = spark_mat
 
 	_rising_sparks.draw_pass_1 = mesh
@@ -378,12 +509,14 @@ func _create_lightning_bolts() -> void:
 	var mesh := QuadMesh.new()
 	mesh.size = Vector2(0.02, 0.3)
 
+	# Additive blend for glow effect
 	var bolt_mat := StandardMaterial3D.new()
 	bolt_mat.albedo_color = Color(0.7, 0.9, 1.0)
 	bolt_mat.emission_enabled = true
 	bolt_mat.emission = Color(0.5, 0.7, 1.0)
-	bolt_mat.emission_energy_multiplier = 8.0
-	bolt_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	bolt_mat.emission_energy_multiplier = 10.0
+	bolt_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD  # Additive blending
+	bolt_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	bolt_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	mesh.material = bolt_mat
 
@@ -393,9 +526,185 @@ func _create_lightning_bolts() -> void:
 	_spell_effects_container.add_child(_lightning_bolts)
 
 
+func _create_character_aura_shader() -> void:
+	# Create Fresnel aura shader for character glow during casting
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, cull_front;
+
+uniform vec4 aura_color : source_color = vec4(0.3, 0.5, 1.0, 1.0);
+uniform vec4 secondary_color : source_color = vec4(0.6, 0.3, 1.0, 1.0);
+uniform float intensity : hint_range(0.0, 10.0) = 2.0;
+uniform float fresnel_power : hint_range(0.1, 10.0) = 2.0;
+uniform float pulse_speed : hint_range(0.0, 20.0) = 8.0;
+uniform float scale_offset : hint_range(1.0, 1.2) = 1.02;
+
+void vertex() {
+	// Expand mesh slightly outward for aura effect
+	VERTEX *= scale_offset;
+}
+
+void fragment() {
+	// Fresnel effect: stronger glow at edges
+	float fresnel = pow(1.0 - abs(dot(NORMAL, VIEW)), fresnel_power);
+
+	// Pulse effect
+	float pulse = 0.7 + 0.3 * sin(TIME * pulse_speed);
+
+	// Color mix between blue and purple
+	float color_mix = 0.5 + 0.5 * sin(TIME * 3.0);
+	vec3 final_color = mix(aura_color.rgb, secondary_color.rgb, color_mix);
+
+	ALBEDO = final_color * intensity * pulse;
+	ALPHA = fresnel * aura_color.a * pulse;
+	EMISSION = final_color * intensity * fresnel * pulse * 2.0;
+}
+"""
+	_character_aura_material = ShaderMaterial.new()
+	_character_aura_material.shader = shader
+	_character_aura_material.set_shader_parameter("aura_color", Color(0.3, 0.5, 1.0, 0.8))
+	_character_aura_material.set_shader_parameter("secondary_color", Color(0.6, 0.3, 1.0, 0.6))
+	_character_aura_material.set_shader_parameter("intensity", 3.0)
+	_character_aura_material.set_shader_parameter("fresnel_power", 2.5)
+	_character_aura_material.set_shader_parameter("pulse_speed", 12.0)
+
+
+func _create_procedural_lightning_bolts() -> void:
+	# Create Lightning3DBranched instances from the lightning addon
+	# Each bolt shoots from the character upward/outward with branching
+	for i in range(NUM_LIGHTNING_BOLTS):
+		# Create Lightning3DBranched with parameters:
+		# subdivisions=10, max_deviation=0.6, branches=4, branch_deviation=0.4, bias=0.5
+		var bolt := Lightning3DBranchedClass.new(10, 0.6, 4, 0.4, 0.5, Lightning3DBranchedClass.UPDATE_MODE.ON_PROCESS)
+		bolt.name = "LightningBolt3D_%d" % i
+		bolt.visible = false
+		bolt.maximum_update_delta = 0.08  # Update every ~80ms for animation
+		bolt.branches_to_end = false  # Branches spread out
+
+		# Set initial origin/end points (will be updated when spell starts)
+		var angle := TAU * i / NUM_LIGHTNING_BOLTS
+		bolt.origin = Vector3(0, 0.5, 0)
+		bolt.end = Vector3(cos(angle) * 1.5, 3.0, sin(angle) * 1.5)
+
+		_spell_effects_container.add_child(bolt)
+		_lightning_bolts_3d.append(bolt)
+
+
+func _create_spell_audio_system() -> void:
+	# Create audio players for spell sound effects
+	# NOTE: Audio streams not provided - assign .ogg/.wav files in inspector or load at runtime
+
+	# Scream/power-up sound - plays once at spell start
+	_audio_scream = AudioStreamPlayer3D.new()
+	_audio_scream.name = "SpellScream"
+	_audio_scream.volume_db = -3.0  # Default volume, range [-5, 0]
+	_audio_scream.pitch_scale = 1.0  # Range [0.9, 1.1] for variation
+	_audio_scream.max_distance = 20.0
+	_audio_scream.unit_size = 3.0
+	_spell_effects_container.add_child(_audio_scream)
+
+	# Electric static - loops during spell cast
+	_audio_static = AudioStreamPlayer3D.new()
+	_audio_static.name = "SpellStatic"
+	_audio_static.volume_db = -10.0
+	_audio_static.max_distance = 15.0
+	_audio_static.unit_size = 2.0
+	# Note: Set stream.loop = true when audio is assigned
+	_spell_effects_container.add_child(_audio_static)
+
+	# Discharge sound - plays once at spell end
+	_audio_discharge = AudioStreamPlayer3D.new()
+	_audio_discharge.name = "SpellDischarge"
+	_audio_discharge.volume_db = -3.0
+	_audio_discharge.max_distance = 25.0
+	_audio_discharge.unit_size = 4.0
+	_spell_effects_container.add_child(_audio_discharge)
+
+
+func _randomize_lightning_bolt_endpoints() -> void:
+	# Set random endpoints for each Lightning3DBranched bolt
+	for i in range(_lightning_bolts_3d.size()):
+		var bolt = _lightning_bolts_3d[i]
+		if not bolt.visible:
+			continue
+
+		# Random start/end points around the character
+		var angle := TAU * i / _lightning_bolts_3d.size() + randf_range(-0.3, 0.3)
+		var height_start := randf_range(0.3, 0.8)
+		var height_end := randf_range(2.5, 4.0)
+		var radius_start := randf_range(0.2, 0.4)
+		var radius_end := randf_range(1.0, 2.0)
+
+		var start := Vector3(cos(angle) * radius_start, height_start, sin(angle) * radius_start)
+		var end_angle := angle + randf_range(-0.5, 0.5)
+		var end := Vector3(cos(end_angle) * radius_end, height_end, sin(end_angle) * radius_end)
+
+		bolt.set_origin(start)
+		bolt.set_end(end)
+
+
+func _update_spell_effects(delta: float) -> void:
+	if not is_casting:
+		return
+
+	_spell_time += delta
+
+	# Flickering light using sin() with high frequency
+	var base_energy := 6.0
+	var flicker := sin(_spell_time * 20.0) * 2.0 + sin(_spell_time * 33.0) * 1.0 + sin(_spell_time * 47.0) * 0.5
+	_spell_light.light_energy = base_energy + flicker
+
+	# Lightning3DBranched auto-updates via ON_PROCESS mode - no manual regeneration needed
+
+
+func _apply_character_aura() -> void:
+	# Apply the Fresnel aura shader as overlay on the active character
+	var active_char := _armed_character if combat_mode == CombatMode.ARMED else _unarmed_character
+	if active_char == null:
+		return
+
+	# Find all MeshInstance3D nodes recursively and apply aura
+	_original_character_materials.clear()
+	_apply_aura_recursive(active_char)
+	print("Applied aura to ", _original_character_materials.size(), " meshes")
+
+
+func _apply_aura_recursive(node: Node) -> void:
+	if node is MeshInstance3D:
+		var mesh_inst := node as MeshInstance3D
+		# Store original material
+		_original_character_materials.append({"mesh": mesh_inst, "material": mesh_inst.material_override})
+		# Apply aura as next_pass to create overlay effect
+		if mesh_inst.material_override:
+			var mat := mesh_inst.material_override.duplicate() as Material
+			mat.next_pass = _character_aura_material
+			mesh_inst.material_override = mat
+		else:
+			# Create a simple pass-through material with the aura as next_pass
+			var base_mat := StandardMaterial3D.new()
+			base_mat.next_pass = _character_aura_material
+			mesh_inst.material_override = base_mat
+
+	for child in node.get_children():
+		_apply_aura_recursive(child)
+
+
+func _remove_character_aura() -> void:
+	# Remove the aura shader and restore original materials
+	for entry: Dictionary in _original_character_materials:
+		var mesh_inst: MeshInstance3D = entry.mesh
+		if is_instance_valid(mesh_inst):
+			mesh_inst.material_override = entry.material
+	_original_character_materials.clear()
+
+
 func _start_spell_effects() -> void:
 	if _spell_tween:
 		_spell_tween.kill()
+
+	# Reset spell time for flickering
+	_spell_time = 0.0
 
 	_spell_tween = create_tween()
 	_spell_tween.set_parallel(true)
@@ -405,7 +714,16 @@ func _start_spell_effects() -> void:
 	_magic_circle.scale = Vector3(0.01, 0.01, 0.01)
 	_spell_tween.tween_property(_magic_circle, "scale", Vector3(1.0, 1.0, 1.0), 0.4).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
-	# Animate spell light
+	# Show and animate force field sphere (V2: bubble shield)
+	_force_field_sphere.visible = true
+	_force_field_sphere.scale = Vector3(0.01, 0.01, 0.01)
+	_spell_tween.tween_property(_force_field_sphere, "scale", Vector3(1.0, 1.0, 1.0), 0.5).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
+
+	# Animate force field constant light (non-flickering, steady glow)
+	_force_field_light.light_energy = 0.0
+	_spell_tween.tween_property(_force_field_light, "light_energy", 2.0, 0.4).set_ease(Tween.EASE_OUT)
+
+	# Animate spell light (initial value, will be modulated by _update_spell_effects)
 	_spell_light.light_energy = 0.0
 	_spell_tween.tween_property(_spell_light, "light_energy", 6.0, 0.3).set_ease(Tween.EASE_OUT)
 
@@ -416,6 +734,21 @@ func _start_spell_effects() -> void:
 
 	# Rotate magic circle
 	_spell_tween.tween_property(_magic_circle, "rotation_degrees:y", 360.0, 2.0).from(0.0)
+
+	# Show 3D lightning bolts (addon-based with animated shader)
+	for bolt in _lightning_bolts_3d:
+		bolt.visible = true
+	_randomize_lightning_bolt_endpoints()
+
+	# Apply character aura
+	_apply_character_aura()
+
+	# Start audio (only plays if streams are assigned)
+	if _audio_scream.stream:
+		_audio_scream.pitch_scale = randf_range(0.9, 1.1)  # Slight pitch variation
+		_audio_scream.play()
+	if _audio_static.stream:
+		_audio_static.play()
 
 
 func _stop_spell_effects() -> void:
@@ -429,6 +762,13 @@ func _stop_spell_effects() -> void:
 	_spell_tween.tween_property(_magic_circle, "scale", Vector3(0.01, 0.01, 0.01), 0.3).set_ease(Tween.EASE_IN)
 	_spell_tween.tween_callback(func(): _magic_circle.visible = false).set_delay(0.3)
 
+	# Shrink and hide force field sphere (V2: bubble shield collapse)
+	_spell_tween.tween_property(_force_field_sphere, "scale", Vector3(0.01, 0.01, 0.01), 0.4).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_BACK)
+	_spell_tween.tween_callback(func(): _force_field_sphere.visible = false).set_delay(0.4)
+
+	# Fade out force field constant light
+	_spell_tween.tween_property(_force_field_light, "light_energy", 0.0, 0.3).set_ease(Tween.EASE_IN)
+
 	# Fade out spell light
 	_spell_tween.tween_property(_spell_light, "light_energy", 0.0, 0.4).set_ease(Tween.EASE_IN)
 
@@ -436,6 +776,19 @@ func _stop_spell_effects() -> void:
 	_lightning_particles.emitting = false
 	_rising_sparks.emitting = false
 	_lightning_bolts.emitting = false
+
+	# Hide 3D lightning bolts
+	for bolt in _lightning_bolts_3d:
+		bolt.visible = false
+
+	# Remove character aura
+	_remove_character_aura()
+
+	# Stop audio and play discharge (only plays if streams are assigned)
+	if _audio_static.playing:
+		_audio_static.stop()
+	if _audio_discharge.stream:
+		_audio_discharge.play()
 
 
 func _get_unarmed_config() -> Dictionary:
@@ -892,6 +1245,9 @@ func _input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	if _attack_cooldown > 0:
 		_attack_cooldown -= delta
+
+	# Update spell effects (flickering light, procedural bolts)
+	_update_spell_effects(delta)
 
 	# Gamepad camera control (right stick)
 	var look_x: float = Input.get_action_strength(&"camera_look_right") - Input.get_action_strength(&"camera_look_left")

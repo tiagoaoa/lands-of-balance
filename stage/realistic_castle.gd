@@ -1,14 +1,62 @@
 extends Node3D
 ## Builds a realistic medieval castle using Quaternius modular pieces
+##
+## REQUIRED ASSETS (place in res://assets/quaternius_village/):
+## Download from: https://quaternius.com/packs/ultimatemodularmedievalpack.html
+##
+## Walls:
+##   - Wall_UnevenBrick_Straight.gltf
+##   - Wall_UnevenBrick_Door_Round.gltf
+##   - Wall_UnevenBrick_Window_Wide_Round.gltf
+##   - Wall_UnevenBrick_Window_Thin_Round.gltf
+##   - Wall_Arch.gltf
+##
+## Floors:
+##   - Floor_WoodDark.gltf
+##
+## Roofs:
+##   - Roof_RoundTiles_6x6.gltf
+##   - Roof_Tower_RoundTiles.gltf
+##   - Roof_RoundTiles_6x4.gltf
+##
+## Props:
+##   - Door_2_Round.gltf
+##   - WindowShutters_Wide_Round_Closed.gltf
+##   - Stairs_Exterior_Straight.gltf
+##   - Prop_Crate.gltf
+##   - Prop_Wagon.gltf
+##   - Prop_WoodenFence_Single.gltf
+##   - Prop_Vine1.gltf
+##   - Prop_Vine2.gltf
+##
+## If assets are missing, castle building is silently skipped.
 
 const QUAT_PATH := "res://assets/quaternius_village/"
 
 var _loaded: Dictionary = {}
 
+var _assets_available: bool = false
+
 func _ready() -> void:
-	call_deferred("_build_castle")
+	# Check if any Quaternius village assets exist
+	_assets_available = DirAccess.dir_exists_absolute(QUAT_PATH.replace("res://", "")) and _has_any_gltf()
+	if _assets_available:
+		call_deferred("_build_castle")
+
+func _has_any_gltf() -> bool:
+	var dir := DirAccess.open(QUAT_PATH)
+	if dir:
+		dir.list_dir_begin()
+		var file_name := dir.get_next()
+		while file_name != "":
+			if file_name.ends_with(".gltf"):
+				return true
+			file_name = dir.get_next()
+	return false
 
 func _load(model_name: String) -> PackedScene:
+	if not _assets_available:
+		return null
 	var path := QUAT_PATH + model_name + ".gltf"
 	if _loaded.has(path):
 		return _loaded[path]
@@ -16,7 +64,6 @@ func _load(model_name: String) -> PackedScene:
 		var scene := load(path) as PackedScene
 		_loaded[path] = scene
 		return scene
-	push_warning("Model not found: " + path)
 	return null
 
 func _place(model_name: String, pos: Vector3, rot_y: float = 0.0, scl: float = 1.0) -> Node3D:
