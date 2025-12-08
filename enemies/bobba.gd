@@ -88,37 +88,30 @@ func _setup_model() -> void:
 
 
 func _apply_textures(node: Node) -> void:
-	# Apply the Maw J Laygo textures to all mesh instances
+	# Load the pre-made material with textures
+	var bobba_mat = load("res://assets/bobba/bobba_material.tres") as StandardMaterial3D
+	if bobba_mat == null:
+		print("Bobba: Failed to load material!")
+		return
+
+	_apply_material_recursive(node, bobba_mat)
+
+
+func _apply_material_recursive(node: Node, mat: Material) -> void:
 	if node is MeshInstance3D:
 		var mesh_inst := node as MeshInstance3D
-		var mat := StandardMaterial3D.new()
+		print("Bobba: Applying material to ", mesh_inst.name)
 
-		# Load textures
-		var diffuse_tex = load("res://assets/bobba/Maw J Laygo_0.png") as Texture2D
-		var normal_tex = load("res://assets/bobba/Maw J Laygo_1.png") as Texture2D
-		var ao_tex = load("res://assets/bobba/Maw J Laygo_2.png") as Texture2D
-		var roughness_tex = load("res://assets/bobba/Maw J Laygo_3.png") as Texture2D
+		# Apply material override to the entire mesh
+		mesh_inst.material_override = mat
 
-		if diffuse_tex:
-			mat.albedo_texture = diffuse_tex
-		if normal_tex:
-			mat.normal_enabled = true
-			mat.normal_texture = normal_tex
-		if roughness_tex:
-			mat.roughness_texture = roughness_tex
-
-		mat.metallic = 0.0
-		mat.roughness = 0.8
-
-		# Apply to all surfaces
-		for i in range(mesh_inst.get_surface_override_material_count()):
-			mesh_inst.set_surface_override_material(i, mat)
-
-		if mesh_inst.get_surface_override_material_count() == 0:
-			mesh_inst.material_override = mat
+		# Also try applying to individual surfaces
+		if mesh_inst.mesh:
+			for i in range(mesh_inst.mesh.get_surface_count()):
+				mesh_inst.set_surface_override_material(i, mat)
 
 	for child in node.get_children():
-		_apply_textures(child)
+		_apply_material_recursive(child, mat)
 
 
 func _find_animation_player(node: Node) -> AnimationPlayer:
