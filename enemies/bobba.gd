@@ -77,11 +77,48 @@ func _setup_model() -> void:
 			break
 
 	if _model:
+		# Apply textures to the model
+		_apply_textures(_model)
+
 		_anim_player = _find_animation_player(_model)
 		if _anim_player:
 			_anim_player.animation_finished.connect(_on_animation_finished)
 			_load_animations()
 			_play_anim(&"bobba/Idle")
+
+
+func _apply_textures(node: Node) -> void:
+	# Apply the Maw J Laygo textures to all mesh instances
+	if node is MeshInstance3D:
+		var mesh_inst := node as MeshInstance3D
+		var mat := StandardMaterial3D.new()
+
+		# Load textures
+		var diffuse_tex = load("res://assets/bobba/Maw J Laygo_0.png") as Texture2D
+		var normal_tex = load("res://assets/bobba/Maw J Laygo_1.png") as Texture2D
+		var ao_tex = load("res://assets/bobba/Maw J Laygo_2.png") as Texture2D
+		var roughness_tex = load("res://assets/bobba/Maw J Laygo_3.png") as Texture2D
+
+		if diffuse_tex:
+			mat.albedo_texture = diffuse_tex
+		if normal_tex:
+			mat.normal_enabled = true
+			mat.normal_texture = normal_tex
+		if roughness_tex:
+			mat.roughness_texture = roughness_tex
+
+		mat.metallic = 0.0
+		mat.roughness = 0.8
+
+		# Apply to all surfaces
+		for i in range(mesh_inst.get_surface_override_material_count()):
+			mesh_inst.set_surface_override_material(i, mat)
+
+		if mesh_inst.get_surface_override_material_count() == 0:
+			mesh_inst.material_override = mat
+
+	for child in node.get_children():
+		_apply_textures(child)
 
 
 func _find_animation_player(node: Node) -> AnimationPlayer:
