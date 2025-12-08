@@ -1,4 +1,4 @@
-[gd_scene load_steps=39 format=4 uid="uid://b2lcb4fy8his1"]
+[gd_scene load_steps=37 format=4 uid="uid://b2lcb4fy8his1"]
 
 [ext_resource type="Script" uid="uid://vw47tquoshc7" path="res://stage/stage.gd" id="1_stage"]
 [ext_resource type="Script" uid="uid://cuveftns1euyj" path="res://stage/village_decorator.gd" id="2_decorator"]
@@ -8,8 +8,6 @@
 [ext_resource type="Texture2D" uid="uid://qwev4imcwa6t" path="res://assets/textures/Ground037_1K-JPG_AmbientOcclusion.jpg" id="5_wdnaj"]
 [ext_resource type="Texture2D" uid="uid://btgo46veltw5p" path="res://assets/textures/Ground037_1K-JPG_NormalGL.jpg" id="6_grb1b"]
 [ext_resource type="Texture2D" uid="uid://timtsnrreaat" path="res://assets/textures/Ground037_1K-JPG_Roughness.jpg" id="7_5v762"]
-[ext_resource type="PackedScene" uid="uid://dukdx43suoeqp" path="res://assets/bunratty_castle.glb" id="10_grb1b"]
-[ext_resource type="PackedScene" uid="uid://cqorrhm68dacv" path="res://assets/realistic_grass.glb" id="10_wdnaj"]
 [ext_resource type="Script" uid="uid://cqt5ps4836h1y" path="res://stage/village_loader.gd" id="11_village"]
 [ext_resource type="ArrayMesh" uid="uid://cjuambqh6hteo" path="res://assets/mountain.obj" id="13_mountain"]
 [ext_resource type="Script" uid="uid://cy2oeam0to8yt" path="res://stage/hills_collision.gd" id="14_hills_script"]
@@ -454,15 +452,3 @@ multimesh = SubResource("MultiMesh_grb1b")
 [node name="RealisticGrass" type="MultiMeshInstance3D" parent="Grass"]
 cast_shadow = 0
 multimesh = SubResource("MultiMesh_5v762")
-
-[node name="Sketchfab_Scene" parent="." instance=ExtResource("10_wdnaj")]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -7.9872665, -0.25731087, -19.308586)
-
-[node name="Sketchfab_Scene2" parent="." instance=ExtResource("10_wdnaj")]
-transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, 26.723375, -0.042243004, 11.732845)
-
-[node name="Sketchfab_Scene3" parent="." instance=ExtResource("10_grb1b")]
-transform = Transform3D(0.2982515, 0.032342546, 0, -0.032342546, 0.2982515, 0, 0, 0, 0.29999998, 134.51343, 181.82414, 228.59973)
-
-[node name="Sketchfab_Scene4" parent="." instance=ExtResource("10_grb1b")]
-transform = Transform3D(0.9941717, 0.10780849, 0, -0.10780849, 0.9941717, 0, 0, 0, 1, 224.66736, 13.248631, 414.59692)
