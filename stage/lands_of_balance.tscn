@@ -1,4 +1,4 @@
-[gd_scene load_steps=37 format=4 uid="uid://b2lcb4fy8his1"]
+[gd_scene load_steps=39 format=4 uid="uid://b2lcb4fy8his1"]
 
 [ext_resource type="Script" uid="uid://vw47tquoshc7" path="res://stage/stage.gd" id="1_stage"]
 [ext_resource type="Script" uid="uid://cuveftns1euyj" path="res://stage/village_decorator.gd" id="2_decorator"]
@@ -12,7 +12,9 @@
 [ext_resource type="PackedScene" uid="uid://cqorrhm68dacv" path="res://assets/realistic_grass.glb" id="10_wdnaj"]
 [ext_resource type="Script" uid="uid://cqt5ps4836h1y" path="res://stage/village_loader.gd" id="11_village"]
 [ext_resource type="ArrayMesh" uid="uid://cjuambqh6hteo" path="res://assets/mountain.obj" id="13_mountain"]
-[ext_resource type="Script" path="res://stage/hills_collision.gd" id="14_hills_script"]
+[ext_resource type="Script" uid="uid://cy2oeam0to8yt" path="res://stage/hills_collision.gd" id="14_hills_script"]
+[ext_resource type="Script" uid="uid://cttuo1ybj4q5g" path="res://enemies/dragon.gd" id="15_dragon"]
+[ext_resource type="Script" uid="uid://bs4bnr00cor2t" path="res://stage/moon.gd" id="16_moon"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_15kie"]
 sky_top_color = Color(0.15, 0.18, 0.25, 1)
@@ -26,39 +28,37 @@ sky_material = SubResource("ProceduralSkyMaterial_15kie")
 
 [sub_resource type="Environment" id="Environment_wdnaj"]
 background_mode = 2
-background_energy_multiplier = 0.225
+background_energy_multiplier = 2.0
 sky = SubResource("Sky_js6ng")
 ambient_light_source = 2
-ambient_light_color = Color(0.12, 0.15, 0.2, 1)
-ambient_light_energy = 0.45
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_energy = 4.0
 tonemap_mode = 2
-tonemap_exposure = 0.8
+tonemap_exposure = 2.0
 ssao_enabled = true
 ssao_radius = 2.0
 ssao_intensity = 1.5
 ssao_power = 2.0
 ssao_light_affect = 0.3
 glow_enabled = true
-glow_intensity = 0.4
-glow_strength = 0.8
-glow_bloom = 0.1
-fog_enabled = true
+glow_intensity = 0.2
+glow_strength = 0.4
+glow_bloom = 0.05
 fog_light_color = Color(0.4, 0.45, 0.5, 1)
-fog_light_energy = 0.3
-fog_density = 0.025
-fog_sky_affect = 0.8
-fog_height_density = 0.1
-volumetric_fog_enabled = true
-volumetric_fog_density = 0.03
+fog_light_energy = 0.5
+fog_density = 0.0075
+fog_sky_affect = 0.24
+fog_height_density = 0.03
+volumetric_fog_density = 0.009
 volumetric_fog_albedo = Color(0.5, 0.55, 0.6, 1)
 volumetric_fog_emission = Color(0.02, 0.025, 0.03, 1)
-volumetric_fog_emission_energy = 0.5
+volumetric_fog_emission_energy = 0.15
 volumetric_fog_anisotropy = 0.3
 volumetric_fog_length = 80.0
 volumetric_fog_detail_spread = 0.8
-volumetric_fog_ambient_inject = 0.1
+volumetric_fog_ambient_inject = 0.03
 adjustment_enabled = true
-adjustment_brightness = 0.85
+adjustment_brightness = 0.425
 adjustment_contrast = 1.15
 adjustment_saturation = 0.6
 
@@ -84,7 +84,6 @@ roughness = 0.1
 [sub_resource type="StandardMaterial3D" id="mat_path"]
 albedo_color = Color(0.55, 0.45, 0.3, 1)
 roughness = 0.95
-
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_16tto"]
 resource_name = "grass"
@@ -269,6 +268,7 @@ script = ExtResource("1_stage")
 
 [node name="LightingManager" type="Node" parent="."]
 script = ExtResource("2_js6ng")
+time_of_day = 1
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_wdnaj")
@@ -277,16 +277,20 @@ environment = SubResource("Environment_wdnaj")
 transform = Transform3D(0.5262583, 0.22008014, -0.8213507, -9.642971e-10, 0.9659258, 0.25881895, 0.8503247, -0.13620561, 0.50832653, 176.20892, 4804.189, 4579.207)
 layers = 0
 light_color = Color(0.6, 0.65, 0.75, 1)
-light_energy = 0.1
-light_indirect_energy = 0.2
+light_energy = 4.0
 shadow_enabled = true
 shadow_bias = 0.03
 shadow_opacity = 0.8
 
+[node name="Moon" type="Node3D" parent="."]
+script = ExtResource("16_moon")
+moon_size = 80.0
+moon_distance = 400.0
+moon_elevation = 25.0
+
 [node name="Ground" type="Node3D" parent="."]
 
 [node name="MainGround" type="CSGBox3D" parent="Ground"]
-transform = Transform3D(0.9999987, -7.0950384e-11, -0.0016231555, 7.0950384e-11, 1, -5.731884e-14, 0.0016231555, -5.731884e-14, 0.9999987, 92.36858, -0.5, -170.25363)
 use_collision = true
 size = Vector3(1070.5386, 1, 1144.983)
 material = SubResource("StandardMaterial3D_0t235")
@@ -394,18 +398,26 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -20, -250)
 script = ExtResource("14_hills_script")
 
 [node name="HillsMesh" type="MeshInstance3D" parent="TheHills"]
-transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, -354.93457, -72.4234, -539.79333)
+transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, -424.53064, 19.3497, 310.28354)
 mesh = ExtResource("13_mountain")
 
 [node name="HillsCollision" type="CollisionShape3D" parent="TheHills"]
 transform = Transform3D(100, 0, 0, 0, 100, 0, 0, 0, 100, -354.93457, -72.4234, -539.79333)
-
 
 [node name="HillsLabel" type="Label3D" parent="TheHills"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 120, 0)
 text = "The Hills"
 font_size = 36
 outline_size = 5
+
+[node name="Dragon" type="CharacterBody3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 0, 0)
+motion_mode = 1
+script = ExtResource("15_dragon")
+patrol_radius = 10.0
+patrol_height = 8.0
+attack_range = 15.0
+detection_range = 30.0
 
 [node name="BurningPeaks" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -120, 0, 0)

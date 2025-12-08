@@ -8,14 +8,15 @@ extends CharacterBody3D
 # Lightning addon preloads
 const Lightning3DBranchedClass = preload("res://addons/lightning/generators/Lightning3DBranched.gd")
 
-const MAX_SPEED: float = 5.0
-const RUN_SPEED: float = 8.0
+const WALK_SPEED: float = 3.5
+const RUN_SPEED: float = 7.0
 const ACCEL: float = 12.0
 const DEACCEL: float = 12.0
 const JUMP_VELOCITY: float = 6.0
 const MOUSE_SENSITIVITY: float = 0.002
 const GAMEPAD_SENSITIVITY: float = 2.5  # radians per second at full stick
 const CAMERA_VERTICAL_LIMIT: float = 85.0  # degrees
+const RUN_THRESHOLD: float = 0.6  # Stick intensity threshold for running (60%)
 
 # Combat mode enum
 enum CombatMode { UNARMED, ARMED }
@@ -1228,8 +1229,8 @@ func _input(event: InputEvent) -> void:
 		if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 			is_blocking = event.pressed
 
-	# Spell cast with C key or gamepad B button (armed mode only)
-	if event.is_action_pressed(&"spell_cast"):
+	# Spell cast with C key, gamepad B button, or RB (armed mode only)
+	if event.is_action_pressed(&"spell_cast") or event.is_action_pressed(&"cast_spell_rb"):
 		_do_spell_cast()
 
 	# Mouse look
@@ -1274,23 +1275,20 @@ func _physics_process(delta: float) -> void:
 			velocity.y = JUMP_VELOCITY
 			is_jumping = true
 
-	# Check for running (Shift key)
-	is_running = Input.is_action_pressed(&"run") if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED else false
+	# Get movement input with analog stick support
+	var input_dir := Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back", 0.15)
+	var input_strength := input_dir.length()  # 0.0 to 1.0 for analog stick intensity
 
-	var current_max_speed: float = RUN_SPEED if is_running else MAX_SPEED
+	# Determine run state: Shift key OR stick pushed >60%
+	var keyboard_run := Input.is_action_pressed(&"run") if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED else false
+	is_running = keyboard_run or input_strength > RUN_THRESHOLD
+
+	var current_max_speed: float = RUN_SPEED if is_running else WALK_SPEED
 	var horizontal_velocity := Vector3(velocity.x, 0, velocity.z)
 
-	# Get movement input
-	var input_dir := Vector2.ZERO
-	if Input.is_action_pressed(&"move_forward"):
-		input_dir.y -= 1
-	if Input.is_action_pressed(&"move_back"):
-		input_dir.y += 1
-	if Input.is_action_pressed(&"move_left"):
-		input_dir.x -= 1
-	if Input.is_action_pressed(&"move_right"):
-		input_dir.x += 1
-	input_dir = input_dir.normalized()
+	# Normalize input direction for consistent movement
+	if input_dir.length() > 0.1:
+		input_dir = input_dir.normalized()
 
 	# Reduce movement speed while attacking
 	if is_attacking:
