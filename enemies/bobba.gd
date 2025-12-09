@@ -77,7 +77,8 @@ func _setup_model() -> void:
 			break
 
 	if _model:
-		# Apply textures to the model
+		# Always force-apply our material to ensure visibility
+		print("Bobba: Force-applying material to model")
 		_apply_textures(_model)
 
 		_anim_player = _find_animation_player(_model)
@@ -85,6 +86,26 @@ func _setup_model() -> void:
 			_anim_player.animation_finished.connect(_on_animation_finished)
 			_load_animations()
 			_play_anim(&"bobba/Idle")
+
+
+func _check_needs_material(node: Node) -> bool:
+	# Check if any mesh has a valid albedo texture
+	if node is MeshInstance3D:
+		var mesh_inst := node as MeshInstance3D
+		if mesh_inst.mesh:
+			for i in range(mesh_inst.mesh.get_surface_count()):
+				var mat = mesh_inst.get_surface_override_material(i)
+				if mat == null:
+					mat = mesh_inst.mesh.surface_get_material(i)
+				if mat is StandardMaterial3D:
+					var std_mat = mat as StandardMaterial3D
+					if std_mat.albedo_texture != null:
+						print("Bobba: Found existing texture on ", mesh_inst.name)
+						return false
+	for child in node.get_children():
+		if not _check_needs_material(child):
+			return false
+	return true
 
 
 func _apply_textures(node: Node) -> void:
@@ -98,17 +119,23 @@ func _apply_textures(node: Node) -> void:
 
 
 func _apply_material_recursive(node: Node, mat: Material) -> void:
+	print("Bobba: Checking node ", node.name, " [", node.get_class(), "]")
+
 	if node is MeshInstance3D:
 		var mesh_inst := node as MeshInstance3D
-		print("Bobba: Applying material to ", mesh_inst.name)
+		print("Bobba: Found MeshInstance3D: ", mesh_inst.name)
 
 		# Apply material override to the entire mesh
 		mesh_inst.material_override = mat
+		print("Bobba: Applied material_override")
 
 		# Also try applying to individual surfaces
 		if mesh_inst.mesh:
-			for i in range(mesh_inst.mesh.get_surface_count()):
+			var surface_count = mesh_inst.mesh.get_surface_count()
+			print("Bobba: Mesh has ", surface_count, " surfaces")
+			for i in range(surface_count):
 				mesh_inst.set_surface_override_material(i, mat)
+				print("Bobba: Applied to surface ", i)
 
 	for child in node.get_children():
 		_apply_material_recursive(child, mat)

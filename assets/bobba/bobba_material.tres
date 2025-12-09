@@ -4,6 +4,8 @@
 [ext_resource type="Texture2D" path="res://assets/bobba/bobba_character_1.png" id="2_normal"]
 
 [resource]
+transparency = 0
+cull_mode = 0
 albedo_texture = ExtResource("1_diffuse")
 metallic = 0.0
 roughness = 0.7
