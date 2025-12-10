@@ -15,7 +15,7 @@ transform = Transform3D(0.99989533, 6.324284e-10, 0.014468275, -6.324284e-10, 1,
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 10)
 
 [node name="Bobba" parent="." instance=ExtResource("5_bobba")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 18)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1, 18)
 
 [node name="TouchScreenUI" parent="." instance=ExtResource("3_touch")]
 

@@ -74,6 +74,7 @@ func _setup_model() -> void:
 	for child in get_children():
 		if child is Node3D and child.name != "CollisionShape3D":
 			_model = child
+			print("Bobba: Found model: ", child.name)
 			break
 
 	if _model:
@@ -83,9 +84,26 @@ func _setup_model() -> void:
 
 		_anim_player = _find_animation_player(_model)
 		if _anim_player:
+			print("Bobba: Found AnimationPlayer: ", _anim_player.name)
+			print("Bobba: AnimationPlayer root node: ", _anim_player.root_node)
 			_anim_player.animation_finished.connect(_on_animation_finished)
 			_load_animations()
+			print("Bobba: Available animations after load: ", _anim_player.get_animation_list())
 			_play_anim(&"bobba/Idle")
+		else:
+			print("Bobba: ERROR - No AnimationPlayer found in model!")
+			_print_node_tree(_model, 0)
+	else:
+		print("Bobba: ERROR - No model found!")
+
+
+func _print_node_tree(node: Node, depth: int) -> void:
+	var indent = ""
+	for i in range(depth):
+		indent += "  "
+	print(indent, node.name, " [", node.get_class(), "]")
+	for child in node.get_children():
+		_print_node_tree(child, depth + 1)
 
 
 func _check_needs_material(node: Node) -> bool:
@@ -231,31 +249,41 @@ func _load_animations() -> void:
 func _retarget_animation(anim: Animation, target_skeleton_path: String, skeleton: Skeleton3D) -> void:
 	var tracks_to_remove: Array[int] = []
 
+	# Debug: print skeleton bone names once
+	if skeleton.get_bone_count() > 0:
+		print("Bobba: Skeleton has ", skeleton.get_bone_count(), " bones")
+		print("Bobba: First few bones: ", skeleton.get_bone_name(0), ", ", skeleton.get_bone_name(1) if skeleton.get_bone_count() > 1 else "")
+
 	for i in range(anim.get_track_count()):
 		var track_path: NodePath = anim.track_get_path(i)
 		var path_str: String = str(track_path)
 
-		var colon_pos: int = path_str.find(":")
+		# Find the bone name part (after the last colon for skeleton tracks)
+		var colon_pos: int = path_str.rfind(":")
 		if colon_pos == -1:
 			continue
 
 		var bone_name: String = path_str.substr(colon_pos + 1)
 
+		# Convert animation bone names (mixamorig:BoneName) to Godot format (mixamorig_BoneName)
+		var godot_bone_name: String = bone_name.replace(":", "_")
+
 		# Remove root motion from Hips
-		if bone_name == "mixamorig_Hips" and anim.track_get_type(i) == Animation.TYPE_POSITION_3D:
+		if godot_bone_name == "mixamorig_Hips" and anim.track_get_type(i) == Animation.TYPE_POSITION_3D:
 			tracks_to_remove.append(i)
 			continue
 
-		# Verify bone exists
-		if skeleton.find_bone(bone_name) == -1:
-			var alt_bone_name: String = bone_name.replace("mixamorig:", "mixamorig_")
-			if skeleton.find_bone(alt_bone_name) == -1:
+		# Verify bone exists in skeleton
+		if skeleton.find_bone(godot_bone_name) == -1:
+			# Try original name as fallback
+			if skeleton.find_bone(bone_name) != -1:
+				godot_bone_name = bone_name
+			else:
+				print("Bobba: Bone not found: ", bone_name, " / ", godot_bone_name)
 				continue
-			bone_name = alt_bone_name
 
-		var new_path: String = target_skeleton_path + ":" + bone_name
-		if path_str != new_path:
-			anim.track_set_path(i, NodePath(new_path))
+		var new_path: String = target_skeleton_path + ":" + godot_bone_name
+		anim.track_set_path(i, NodePath(new_path))
 
 	tracks_to_remove.reverse()
 	for track_idx in tracks_to_remove:
