@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://cwybaemylrmun"]
 
-[ext_resource type="Script" path="res://addons/lightning/baked/Lightning3D.gd" id="1"]
+[ext_resource type="Script" uid="uid://0on2pqgdcgxm" path="res://addons/lightning/baked/Lightning3D.gd" id="1"]
 
 [sub_resource type="Curve3D" id="Curve3D_nmbox"]
 

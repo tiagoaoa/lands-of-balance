@@ -76,6 +76,18 @@ var is_casting: bool = false
 var attack_combo: int = 0
 var _attack_cooldown: float = 0.0
 
+# Damage/knockback state
+var _knockback_velocity: Vector3 = Vector3.ZERO
+var _is_stunned: bool = false
+var _stun_timer: float = 0.0
+var _hit_flash_tween: Tween
+var _hit_label: Label3D
+var _attack_hitbox: Area3D
+var _has_hit_this_attack: bool = false
+const PLAYER_KNOCKBACK_RESISTANCE: float = 0.8  # Reduce knockback slightly
+const PLAYER_ATTACK_DAMAGE: float = 15.0
+const PLAYER_KNOCKBACK_FORCE: float = 10.0
+
 # Spell VFX components (ProceduralThunderChannel)
 var _spell_effects_container: Node3D
 var _lightning_particles: GPUParticles3D
@@ -111,6 +123,8 @@ func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	_create_characters()
 	_create_lightning_particles()
+	_setup_hit_label()
+	_setup_attack_hitbox()
 
 
 func _create_characters() -> void:
@@ -1010,6 +1024,7 @@ func _retarget_animation(anim: Animation, target_skeleton_path: String, skeleton
 func _on_animation_finished(anim_name: StringName) -> void:
 	if is_attacking:
 		is_attacking = false
+		disable_attack_hitbox()  # Disable hitbox when attack ends
 		_attack_cooldown = 0.2
 		# Play transition from attack to idle (unarmed mode only)
 		if combat_mode == CombatMode.UNARMED and _current_anim_player.has_animation(&"unarmed/ActionToIdle"):
@@ -1147,6 +1162,7 @@ func _do_attack() -> void:
 		return
 
 	is_attacking = true
+	enable_attack_hitbox()  # Enable hitbox when attack starts
 
 	if combat_mode == CombatMode.ARMED:
 		attack_combo = (attack_combo + 1) % 2
@@ -1156,6 +1172,7 @@ func _do_attack() -> void:
 			_current_anim = attack_anim
 		else:
 			is_attacking = false
+			disable_attack_hitbox()
 	else:
 		# Unarmed boxing attack - play transition first if coming from idle
 		if _current_anim == &"unarmed/Idle" and _current_anim_player.has_animation(&"unarmed/IdleToFight"):
@@ -1168,6 +1185,7 @@ func _do_attack() -> void:
 			_current_anim = &"unarmed/Attack"
 		else:
 			is_attacking = false
+			disable_attack_hitbox()
 
 
 func _do_spell_cast() -> void:
@@ -1189,6 +1207,166 @@ func _do_spell_cast() -> void:
 	else:
 		is_casting = false
 		_stop_spell_effects()
+
+
+## Combat - Take damage and knockback from enemy attacks
+func take_hit(damage: float, knockback: Vector3, blocked: bool) -> void:
+	# Show floating "Hit!" label
+	_show_hit_label()
+
+	if blocked:
+		# Blocked hit - blue flash, reduced knockback
+		_flash_hit(Color(0.2, 0.4, 1.0))
+		_knockback_velocity = knockback * PLAYER_KNOCKBACK_RESISTANCE * 0.3
+	else:
+		# Unblocked hit - blue flash, full knockback, stun
+		_flash_hit(Color(0.2, 0.4, 1.0))
+		_knockback_velocity = knockback * PLAYER_KNOCKBACK_RESISTANCE
+		_is_stunned = true
+		_stun_timer = 0.25
+		is_attacking = false  # Cancel attack if hit
+
+	# TODO: Apply damage when health system is implemented
+	print("Player hit! Damage: ", damage, " Blocked: ", blocked)
+
+
+func _flash_hit(color: Color) -> void:
+	if _hit_flash_tween:
+		_hit_flash_tween.kill()
+
+	# Apply color flash to active character model
+	var active_char = _armed_character if combat_mode == CombatMode.ARMED else _unarmed_character
+	if active_char:
+		_apply_hit_flash_recursive(active_char, color)
+
+		# Reset after short delay
+		_hit_flash_tween = create_tween()
+		_hit_flash_tween.tween_callback(func(): _clear_hit_flash_recursive(active_char)).set_delay(0.15)
+
+
+func _apply_hit_flash_recursive(node: Node, color: Color) -> void:
+	if node is MeshInstance3D:
+		var mesh_inst := node as MeshInstance3D
+		var mat = mesh_inst.material_override
+		if mat == null and mesh_inst.mesh:
+			# Create override material if needed
+			for i in range(mesh_inst.mesh.get_surface_count()):
+				var surface_mat = mesh_inst.mesh.surface_get_material(i)
+				if surface_mat is StandardMaterial3D:
+					mat = surface_mat
+					break
+		if mat is StandardMaterial3D:
+			mat.emission_enabled = true
+			mat.emission = color
+			mat.emission_energy_multiplier = 3.0
+
+	for child in node.get_children():
+		_apply_hit_flash_recursive(child, color)
+
+
+func _clear_hit_flash_recursive(node: Node) -> void:
+	if node is MeshInstance3D:
+		var mesh_inst := node as MeshInstance3D
+		var mat = mesh_inst.material_override
+		if mat == null and mesh_inst.mesh:
+			for i in range(mesh_inst.mesh.get_surface_count()):
+				var surface_mat = mesh_inst.mesh.surface_get_material(i)
+				if surface_mat is StandardMaterial3D:
+					mat = surface_mat
+					break
+		if mat is StandardMaterial3D:
+			mat.emission_enabled = false
+
+	for child in node.get_children():
+		_clear_hit_flash_recursive(child)
+
+
+func _setup_hit_label() -> void:
+	# Create floating "Hit!" label above player
+	_hit_label = Label3D.new()
+	_hit_label.name = "HitLabel"
+	_hit_label.text = "Hit!"
+	_hit_label.font_size = 64
+	_hit_label.modulate = Color(0.2, 0.4, 1.0)  # Blue for player
+	_hit_label.outline_modulate = Color(0.0, 0.0, 0.3)
+	_hit_label.outline_size = 8
+	_hit_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_hit_label.no_depth_test = true  # Always visible
+	_hit_label.position = Vector3(0, 2.5, 0)  # Above head
+	_hit_label.visible = false
+	add_child(_hit_label)
+
+
+func _setup_attack_hitbox() -> void:
+	# Create attack hitbox Area3D for melee attacks
+	_attack_hitbox = Area3D.new()
+	_attack_hitbox.name = "AttackHitbox"
+	_attack_hitbox.collision_layer = 0  # Doesn't collide with anything
+	_attack_hitbox.collision_mask = 2   # Detects enemies (layer 2 - Bobba)
+	_attack_hitbox.monitoring = false   # Start disabled
+
+	# Create collision shape - box in front of player
+	var collision_shape = CollisionShape3D.new()
+	var box = BoxShape3D.new()
+	box.size = Vector3(1.5, 1.5, 2.0)  # Wide and deep for sword swings
+	collision_shape.shape = box
+	collision_shape.position = Vector3(0, 1.0, 1.2)  # In front, at chest height
+
+	_attack_hitbox.add_child(collision_shape)
+
+	# Add hitbox to character model so it rotates with the player
+	if _character_model:
+		_character_model.add_child(_attack_hitbox)
+	else:
+		add_child(_attack_hitbox)
+
+	# Connect signal
+	_attack_hitbox.body_entered.connect(_on_attack_hitbox_body_entered)
+
+
+func _on_attack_hitbox_body_entered(body: Node3D) -> void:
+	if _has_hit_this_attack:
+		return
+
+	# Check if we hit an enemy with take_hit method
+	if body.has_method("take_hit"):
+		_has_hit_this_attack = true
+
+		# Calculate knockback direction (from player to enemy)
+		var knockback_dir = (body.global_position - global_position).normalized()
+		knockback_dir.y = 0.2  # Slight upward component
+
+		# Apply damage and knockback
+		body.take_hit(PLAYER_ATTACK_DAMAGE, knockback_dir * PLAYER_KNOCKBACK_FORCE, false)
+		print("Player hit enemy: ", body.name)
+
+
+func enable_attack_hitbox() -> void:
+	_has_hit_this_attack = false
+	_attack_hitbox.monitoring = true
+
+
+func disable_attack_hitbox() -> void:
+	_attack_hitbox.monitoring = false
+
+
+func _show_hit_label() -> void:
+	if _hit_label == null:
+		return
+
+	# Reset and show the label
+	_hit_label.visible = true
+	_hit_label.position = Vector3(0, 2.5, 0)
+	_hit_label.modulate.a = 1.0
+	_hit_label.scale = Vector3(0.5, 0.5, 0.5)
+
+	# Animate: scale up, float up, fade out
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(_hit_label, "scale", Vector3(1.0, 1.0, 1.0), 0.15).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(_hit_label, "position", Vector3(0, 3.5, 0), 0.6).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_hit_label, "modulate:a", 0.0, 0.4).set_delay(0.2)
+	tween.chain().tween_callback(func(): _hit_label.visible = false)
 
 
 func _input(event: InputEvent) -> void:
@@ -1244,8 +1422,29 @@ func _input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Skip movement when console is open (still apply gravity)
+	if GameConsole.is_console_open:
+		velocity += gravity * delta
+		move_and_slide()
+		return
+
 	if _attack_cooldown > 0:
 		_attack_cooldown -= delta
+
+	# Handle stun/knockback state
+	if _is_stunned:
+		_stun_timer -= delta
+		# Apply knockback velocity directly
+		velocity.x = _knockback_velocity.x
+		velocity.z = _knockback_velocity.z
+		velocity.y += gravity.y * delta
+		# Decelerate knockback
+		_knockback_velocity = _knockback_velocity.move_toward(Vector3.ZERO, 30.0 * delta)
+		if _stun_timer <= 0:
+			_is_stunned = false
+			_knockback_velocity = Vector3.ZERO
+		move_and_slide()
+		return
 
 	# Update spell effects (flickering light, procedural bolts)
 	_update_spell_effects(delta)

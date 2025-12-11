@@ -208,8 +208,10 @@ func _transition_lighting() -> void:
 	).set_delay(transition_duration * 0.5)
 
 
-func _input(event: InputEvent) -> void:
-	# Press 'L' to toggle day/night (for testing)
+func _unhandled_key_input(event: InputEvent) -> void:
+	# Press 'L' to toggle day/night (for testing) - only when console is closed
+	if GameConsole.is_console_open:
+		return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_L:
 		toggle_time()
 		print("Switched to: ", "NIGHT" if time_of_day == TimeOfDay.NIGHT else "DAY")

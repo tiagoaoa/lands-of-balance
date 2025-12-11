@@ -3,7 +3,9 @@ extends CharacterBody3D
 ## Bobba - A roaming creature that attacks when the player gets close.
 ## Roams around the map randomly, switches to attack mode within 10 meters of player.
 
-enum State { ROAMING, CHASING, ATTACKING, IDLE }
+signal attack_landed(target: Node3D, knockback_direction: Vector3)
+
+enum State { ROAMING, CHASING, ATTACKING, IDLE, STUNNED }
 
 const ROAM_SPEED: float = 2.0
 const CHASE_SPEED: float = 5.0
@@ -11,12 +13,21 @@ const ATTACK_RANGE: float = 10.0  # Detection radius in meters
 const ATTACK_DISTANCE: float = 2.0  # Distance to start attack animation
 const ROAM_CHANGE_TIME: float = 3.0  # Time between direction changes
 const ROTATION_SPEED: float = 5.0
+const ATTACK_DAMAGE: float = 10.0
+const KNOCKBACK_FORCE: float = 12.0
 
 var state: State = State.ROAMING
 var player: Node3D = null
 var roam_direction: Vector3 = Vector3.ZERO
 var roam_timer: float = 0.0
 var attack_cooldown: float = 0.0
+
+# Combat
+var _attack_hitbox: Area3D
+var _has_hit_this_attack: bool = false
+var _hit_flash_tween: Tween
+var _stun_timer: float = 0.0
+var _hit_label: Label3D
 
 # Animation
 var _anim_player: AnimationPlayer
@@ -41,6 +52,8 @@ const ANIM_PATHS: Dictionary = {
 func _ready() -> void:
 	_find_player()
 	_setup_model()
+	_setup_attack_hitbox()
+	_setup_hit_label()
 	_pick_new_roam_direction()
 
 
@@ -104,6 +117,158 @@ func _print_node_tree(node: Node, depth: int) -> void:
 	print(indent, node.name, " [", node.get_class(), "]")
 	for child in node.get_children():
 		_print_node_tree(child, depth + 1)
+
+
+func _setup_attack_hitbox() -> void:
+	# Create attack hitbox Area3D
+	_attack_hitbox = Area3D.new()
+	_attack_hitbox.name = "AttackHitbox"
+	_attack_hitbox.collision_layer = 0  # Doesn't collide with anything
+	_attack_hitbox.collision_mask = 1   # Detects player (layer 1)
+	_attack_hitbox.monitoring = false   # Start disabled
+
+	# Create collision shape - sphere in front of Bobba
+	var collision_shape = CollisionShape3D.new()
+	var sphere = SphereShape3D.new()
+	sphere.radius = 1.5
+	collision_shape.shape = sphere
+	collision_shape.position = Vector3(0, 1.0, 1.5)  # In front, at chest height
+
+	_attack_hitbox.add_child(collision_shape)
+	add_child(_attack_hitbox)
+
+	# Connect signal
+	_attack_hitbox.body_entered.connect(_on_attack_hitbox_body_entered)
+
+
+func _setup_hit_label() -> void:
+	# Create floating "Hit!" label above character
+	_hit_label = Label3D.new()
+	_hit_label.name = "HitLabel"
+	_hit_label.text = "Hit!"
+	_hit_label.font_size = 64
+	_hit_label.modulate = Color(1.0, 0.2, 0.2)  # Red for enemy
+	_hit_label.outline_modulate = Color(0.3, 0.0, 0.0)
+	_hit_label.outline_size = 8
+	_hit_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_hit_label.no_depth_test = true  # Always visible
+	_hit_label.position = Vector3(0, 3.0, 0)  # Above head
+	_hit_label.visible = false
+	add_child(_hit_label)
+
+
+func _on_attack_hitbox_body_entered(body: Node3D) -> void:
+	if _has_hit_this_attack:
+		return
+
+	if body == player and player and is_instance_valid(player):
+		_has_hit_this_attack = true
+
+		# Calculate knockback direction (from Bobba to player)
+		var knockback_dir = (player.global_position - global_position).normalized()
+		knockback_dir.y = 0.3  # Add slight upward component
+
+		# Check if player is blocking (is_blocking is a variable, not a method)
+		var player_is_blocking: bool = false
+		if "is_blocking" in player:
+			player_is_blocking = player.is_blocking
+
+		if player_is_blocking:
+			# Blocked - reduced knockback, no damage
+			if player.has_method("take_hit"):
+				player.take_hit(0, knockback_dir * KNOCKBACK_FORCE * 0.3, true)
+		else:
+			# Not blocked - full damage and knockback
+			if player.has_method("take_hit"):
+				player.take_hit(ATTACK_DAMAGE, knockback_dir * KNOCKBACK_FORCE, false)
+
+		attack_landed.emit(player, knockback_dir)
+
+
+func enable_attack_hitbox() -> void:
+	_has_hit_this_attack = false
+	_attack_hitbox.monitoring = true
+
+
+func disable_attack_hitbox() -> void:
+	_attack_hitbox.monitoring = false
+
+
+func take_hit(damage: float, knockback: Vector3, _blocked: bool = false) -> void:
+	# Flash red when hit
+	_flash_hit(Color(1.0, 0.2, 0.2))
+
+	# Show floating "Hit!" label
+	_show_hit_label()
+
+	# Apply knockback
+	if knockback.length() > 0:
+		state = State.STUNNED
+		_stun_timer = 0.5
+		velocity = knockback
+		# Force current animation to clear so it can transition properly after stun
+		_current_anim = &""
+
+	print("Bobba took hit! Damage: ", damage, " State: ", state)
+	# TODO: Track health when implementing health system
+
+
+func _show_hit_label() -> void:
+	if _hit_label == null:
+		return
+
+	# Reset and show the label
+	_hit_label.visible = true
+	_hit_label.position = Vector3(0, 3.0, 0)
+	_hit_label.modulate.a = 1.0
+	_hit_label.scale = Vector3(0.5, 0.5, 0.5)
+
+	# Animate: scale up, float up, fade out
+	var tween = create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(_hit_label, "scale", Vector3(1.0, 1.0, 1.0), 0.15).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(_hit_label, "position", Vector3(0, 4.0, 0), 0.6).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_hit_label, "modulate:a", 0.0, 0.4).set_delay(0.2)
+	tween.chain().tween_callback(func(): _hit_label.visible = false)
+
+
+func _flash_hit(color: Color) -> void:
+	if _hit_flash_tween:
+		_hit_flash_tween.kill()
+
+	# Apply color tint to model
+	if _model:
+		_apply_hit_flash_recursive(_model, color)
+
+		# Reset after short delay
+		_hit_flash_tween = create_tween()
+		_hit_flash_tween.tween_callback(func(): _clear_hit_flash_recursive(_model)).set_delay(0.15)
+
+
+func _apply_hit_flash_recursive(node: Node, color: Color) -> void:
+	if node is MeshInstance3D:
+		var mesh_inst := node as MeshInstance3D
+		if mesh_inst.material_override:
+			var mat = mesh_inst.material_override
+			if mat is StandardMaterial3D:
+				mat.emission_enabled = true
+				mat.emission = color
+				mat.emission_energy_multiplier = 3.0
+
+	for child in node.get_children():
+		_apply_hit_flash_recursive(child, color)
+
+
+func _clear_hit_flash_recursive(node: Node) -> void:
+	if node is MeshInstance3D:
+		var mesh_inst := node as MeshInstance3D
+		if mesh_inst.material_override:
+			var mat = mesh_inst.material_override
+			if mat is StandardMaterial3D:
+				mat.emission_enabled = false
+
+	for child in node.get_children():
+		_clear_hit_flash_recursive(child)
 
 
 func _check_needs_material(node: Node) -> bool:
@@ -302,8 +467,13 @@ func _play_anim(anim_name: StringName) -> void:
 
 func _on_animation_finished(anim_name: StringName) -> void:
 	if anim_name == &"bobba/Attack" or anim_name == &"bobba/JumpAttack":
+		disable_attack_hitbox()
 		attack_cooldown = 0.5
 		state = State.CHASING
+	elif anim_name == &"bobba/Roar":
+		# After roar finishes, start chasing
+		state = State.CHASING
+	# Note: Dying animation should not auto-recover - handled separately when health system is added
 
 
 func _pick_new_roam_direction() -> void:
@@ -334,6 +504,8 @@ func _physics_process(delta: float) -> void:
 			_handle_attacking(delta)
 		State.IDLE:
 			_handle_idle(delta, distance_to_player)
+		State.STUNNED:
+			_handle_stunned(delta)
 
 	move_and_slide()
 
@@ -374,6 +546,7 @@ func _handle_chasing(delta: float, distance_to_player: float) -> void:
 	if distance_to_player <= ATTACK_DISTANCE and attack_cooldown <= 0:
 		state = State.ATTACKING
 		_play_anim(&"bobba/Attack")
+		enable_attack_hitbox()  # Enable hitbox when attack starts
 		velocity.x = 0
 		velocity.z = 0
 		return
@@ -399,6 +572,20 @@ func _handle_attacking(_delta: float) -> void:
 	# Stay in attacking state until animation finishes
 	velocity.x = 0
 	velocity.z = 0
+
+
+func _handle_stunned(delta: float) -> void:
+	# Decelerate knockback velocity
+	velocity.x = move_toward(velocity.x, 0, 20.0 * delta)
+	velocity.z = move_toward(velocity.z, 0, 20.0 * delta)
+
+	# Play idle during stun (no special stun animation available)
+	_play_anim(&"bobba/Idle")
+
+	_stun_timer -= delta
+	if _stun_timer <= 0:
+		state = State.CHASING
+		_current_anim = &""  # Clear to allow new animation
 
 
 func _handle_idle(delta: float, distance_to_player: float) -> void:
