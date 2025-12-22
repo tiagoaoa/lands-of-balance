@@ -23,11 +23,17 @@ var roam_timer: float = 0.0
 var attack_cooldown: float = 0.0
 
 # Combat
-var _attack_hitbox: Area3D
+var _left_hand_hitbox: Area3D
+var _right_hand_hitbox: Area3D
+var _left_hand_attachment: BoneAttachment3D
+var _right_hand_attachment: BoneAttachment3D
 var _has_hit_this_attack: bool = false
 var _hit_flash_tween: Tween
 var _stun_timer: float = 0.0
 var _hit_label: Label3D
+var _attack_anim_progress: float = 0.0
+const HAND_HITBOX_START: float = 0.3  # Enable hitbox at 30% of attack animation
+const HAND_HITBOX_END: float = 0.7    # Disable hitbox at 70% of attack animation
 
 # Animation
 var _anim_player: AnimationPlayer
@@ -51,8 +57,8 @@ const ANIM_PATHS: Dictionary = {
 
 func _ready() -> void:
 	_find_player()
+	_setup_attack_hitbox()  # Must be before _setup_model which attaches hitboxes to bones
 	_setup_model()
-	_setup_attack_hitbox()
 	_setup_hit_label()
 	_pick_new_roam_direction()
 
@@ -106,6 +112,9 @@ func _setup_model() -> void:
 		else:
 			print("Bobba: ERROR - No AnimationPlayer found in model!")
 			_print_node_tree(_model, 0)
+
+		# Setup hand bone attachments after model and animations are ready
+		_setup_hand_bone_attachments()
 	else:
 		print("Bobba: ERROR - No model found!")
 
@@ -120,25 +129,108 @@ func _print_node_tree(node: Node, depth: int) -> void:
 
 
 func _setup_attack_hitbox() -> void:
-	# Create attack hitbox Area3D
-	_attack_hitbox = Area3D.new()
-	_attack_hitbox.name = "AttackHitbox"
-	_attack_hitbox.collision_layer = 0  # Doesn't collide with anything
-	_attack_hitbox.collision_mask = 1   # Detects player (layer 1)
-	_attack_hitbox.monitoring = false   # Start disabled
+	# Create hand hitboxes - will be attached to bones after model is set up
+	_left_hand_hitbox = _create_hand_hitbox("LeftHandHitbox")
+	_right_hand_hitbox = _create_hand_hitbox("RightHandHitbox")
 
-	# Create collision shape - sphere in front of Bobba
+	# Connect signals
+	_left_hand_hitbox.body_entered.connect(_on_attack_hitbox_body_entered)
+	_right_hand_hitbox.body_entered.connect(_on_attack_hitbox_body_entered)
+
+
+func _create_hand_hitbox(hitbox_name: String) -> Area3D:
+	var hitbox = Area3D.new()
+	hitbox.name = hitbox_name
+	hitbox.collision_layer = 0  # Doesn't collide with anything
+	hitbox.collision_mask = 1   # Detects player (layer 1)
+	hitbox.monitoring = false   # Start disabled
+
+	# Create collision shape - sphere for hand/fist
 	var collision_shape = CollisionShape3D.new()
 	var sphere = SphereShape3D.new()
-	sphere.radius = 1.5
+	sphere.radius = 0.4  # Fist-sized hitbox
 	collision_shape.shape = sphere
-	collision_shape.position = Vector3(0, 1.0, 1.5)  # In front, at chest height
+	collision_shape.position = Vector3.ZERO
 
-	_attack_hitbox.add_child(collision_shape)
-	add_child(_attack_hitbox)
+	hitbox.add_child(collision_shape)
+	return hitbox
 
-	# Connect signal
-	_attack_hitbox.body_entered.connect(_on_attack_hitbox_body_entered)
+
+func _setup_hand_bone_attachments() -> void:
+	# Attach hand hitboxes to the hand bones
+	if _model == null:
+		print("Bobba: No model, adding hitboxes to self")
+		add_child(_left_hand_hitbox)
+		add_child(_right_hand_hitbox)
+		_left_hand_hitbox.position = Vector3(-0.75, 1.5, 0.75)
+		_right_hand_hitbox.position = Vector3(0.75, 1.5, 0.75)
+		return
+
+	var skeleton: Skeleton3D = _find_skeleton(_model)
+	if skeleton == null:
+		print("Bobba: No skeleton found for hand attachments, using fallback")
+		add_child(_left_hand_hitbox)
+		add_child(_right_hand_hitbox)
+		_left_hand_hitbox.position = Vector3(-0.75, 1.5, 0.75)
+		_right_hand_hitbox.position = Vector3(0.75, 1.5, 0.75)
+		return
+
+	# Debug: print all bone names
+	print("Bobba: Skeleton has ", skeleton.get_bone_count(), " bones:")
+	for i in range(skeleton.get_bone_count()):
+		print("  Bone ", i, ": ", skeleton.get_bone_name(i))
+
+	# Find left hand bone
+	var left_hand_idx: int = _find_hand_bone(skeleton, "Left")
+	if left_hand_idx != -1:
+		_left_hand_attachment = BoneAttachment3D.new()
+		_left_hand_attachment.name = "LeftHandAttachment"
+		_left_hand_attachment.bone_name = skeleton.get_bone_name(left_hand_idx)
+		skeleton.add_child(_left_hand_attachment)
+		_left_hand_attachment.add_child(_left_hand_hitbox)
+		print("Bobba: Attached left hand hitbox to bone: ", skeleton.get_bone_name(left_hand_idx))
+	else:
+		print("Bobba: Left hand bone not found, using fallback position")
+		add_child(_left_hand_hitbox)
+		_left_hand_hitbox.position = Vector3(-0.75, 1.5, 0.75)
+
+	# Find right hand bone
+	var right_hand_idx: int = _find_hand_bone(skeleton, "Right")
+	if right_hand_idx != -1:
+		_right_hand_attachment = BoneAttachment3D.new()
+		_right_hand_attachment.name = "RightHandAttachment"
+		_right_hand_attachment.bone_name = skeleton.get_bone_name(right_hand_idx)
+		skeleton.add_child(_right_hand_attachment)
+		_right_hand_attachment.add_child(_right_hand_hitbox)
+		print("Bobba: Attached right hand hitbox to bone: ", skeleton.get_bone_name(right_hand_idx))
+	else:
+		print("Bobba: Right hand bone not found, using fallback position")
+		add_child(_right_hand_hitbox)
+		_right_hand_hitbox.position = Vector3(0.75, 1.5, 0.75)
+
+
+func _find_hand_bone(skeleton: Skeleton3D, side: String) -> int:
+	# Try various naming conventions for hand bones
+	var possible_names: Array = [
+		"mixamorig_" + side + "Hand",
+		"mixamorig:" + side + "Hand",
+		side + "Hand",
+		side + "_Hand",
+		"mixamorig_" + side + "HandIndex1",  # Some rigs use finger as hand
+	]
+
+	for bone_name in possible_names:
+		var idx = skeleton.find_bone(bone_name)
+		if idx != -1:
+			return idx
+
+	# Fallback: search for any bone containing the side and "hand"
+	for i in range(skeleton.get_bone_count()):
+		var name = skeleton.get_bone_name(i).to_lower()
+		if side.to_lower() in name and "hand" in name:
+			return i
+
+	return -1
 
 
 func _setup_hit_label() -> void:
@@ -158,7 +250,10 @@ func _setup_hit_label() -> void:
 
 
 func _on_attack_hitbox_body_entered(body: Node3D) -> void:
+	print("Bobba: Hand hitbox detected body: ", body.name, " (class: ", body.get_class(), ")")
+
 	if _has_hit_this_attack:
+		print("Bobba: Already hit this attack, ignoring")
 		return
 
 	if body == player and player and is_instance_valid(player):
@@ -177,21 +272,54 @@ func _on_attack_hitbox_body_entered(body: Node3D) -> void:
 			# Blocked - reduced knockback, no damage
 			if player.has_method("take_hit"):
 				player.take_hit(0, knockback_dir * KNOCKBACK_FORCE * 0.3, true)
+			print("Bobba: HIT BLOCKED by player")
 		else:
 			# Not blocked - full damage and knockback
 			if player.has_method("take_hit"):
 				player.take_hit(ATTACK_DAMAGE, knockback_dir * KNOCKBACK_FORCE, false)
+			print("Bobba: HIT LANDED on player")
 
 		attack_landed.emit(player, knockback_dir)
+	else:
+		print("Bobba: Body is not the player")
 
 
 func enable_attack_hitbox() -> void:
+	# Don't immediately enable - will be enabled based on animation progress
 	_has_hit_this_attack = false
-	_attack_hitbox.monitoring = true
+	_attack_anim_progress = 0.0
 
 
 func disable_attack_hitbox() -> void:
-	_attack_hitbox.monitoring = false
+	_left_hand_hitbox.monitoring = false
+	_right_hand_hitbox.monitoring = false
+	_attack_anim_progress = 0.0
+
+
+func _update_attack_hitbox_timing() -> void:
+	# Track attack animation progress and enable hitboxes only during active portion
+	if state != State.ATTACKING or _anim_player == null:
+		return
+
+	# Calculate animation progress (0.0 to 1.0)
+	var anim_length: float = _anim_player.current_animation_length
+	var anim_position: float = _anim_player.current_animation_position
+	if anim_length > 0:
+		_attack_anim_progress = anim_position / anim_length
+	else:
+		_attack_anim_progress = 0.0
+
+	# Enable hitboxes during the active swipe portion (when hands are swinging)
+	var should_be_active: bool = _attack_anim_progress >= HAND_HITBOX_START and _attack_anim_progress <= HAND_HITBOX_END
+
+	if should_be_active and not _left_hand_hitbox.monitoring:
+		_left_hand_hitbox.monitoring = true
+		_right_hand_hitbox.monitoring = true
+		print("Bobba: Hand hitboxes ENABLED at progress ", _attack_anim_progress)
+	elif not should_be_active and _left_hand_hitbox.monitoring:
+		_left_hand_hitbox.monitoring = false
+		_right_hand_hitbox.monitoring = false
+		print("Bobba: Hand hitboxes DISABLED at progress ", _attack_anim_progress)
 
 
 func take_hit(damage: float, knockback: Vector3, _blocked: bool = false) -> void:
@@ -485,6 +613,9 @@ func _pick_new_roam_direction() -> void:
 func _physics_process(delta: float) -> void:
 	if attack_cooldown > 0:
 		attack_cooldown -= delta
+
+	# Update hand hitbox timing based on attack animation progress
+	_update_attack_hitbox_timing()
 
 	# Apply gravity
 	velocity += gravity * delta

@@ -4,7 +4,7 @@
 # Godot-specific ignores
 *.import
 
-# Exported binaries
+# Exported binaries (use GitHub Releases for APKs)
 build/
 
 # External addons/plugins (can be reinstalled)
@@ -19,8 +19,8 @@ temp_assets*/
 # Screenshots (optional, can be large)
 screenshots/
 
-# Export presets (may contain sensitive paths)
-export_presets.cfg
+# Export presets (needed for building)
+# export_presets.cfg
 
 # OS generated files
 .DS_Store

@@ -49,6 +49,7 @@ const ARMED_ANIM_PATHS: Dictionary = {
 	"jump": "res://player/character/armed/Jump.fbx",
 	"attack1": "res://player/character/armed/Attack1.fbx",
 	"attack2": "res://player/character/armed/Attack2.fbx",
+	"sword_slash": "res://player/character/armed/SwordSlash.fbx",
 	"block": "res://player/character/armed/Block.fbx",
 	"sheath": "res://player/character/armed/Sheath.fbx",
 	"spell_cast": "res://player/character/armed/SpellCast.fbx",
@@ -67,7 +68,7 @@ var is_running: bool = false
 var _current_anim: StringName = &""
 
 # Combat state
-var combat_mode: CombatMode = CombatMode.UNARMED
+var combat_mode: CombatMode = CombatMode.ARMED
 var is_attacking: bool = false
 var is_blocking: bool = false
 var is_sheathing: bool = false
@@ -82,8 +83,13 @@ var _is_stunned: bool = false
 var _stun_timer: float = 0.0
 var _hit_flash_tween: Tween
 var _hit_label: Label3D
-var _attack_hitbox: Area3D
+var _attack_hitbox: Area3D  # Sword hitbox for armed mode
+var _unarmed_hitbox: Area3D  # Fist hitbox for unarmed mode
+var _sword_bone_attachment: BoneAttachment3D
 var _has_hit_this_attack: bool = false
+var _attack_anim_progress: float = 0.0
+const SWORD_HITBOX_START: float = 0.3  # Enable hitbox at 30% of attack animation
+const SWORD_HITBOX_END: float = 0.8    # Disable hitbox at 80% of attack animation
 const PLAYER_KNOCKBACK_RESISTANCE: float = 0.8  # Reduce knockback slightly
 const PLAYER_ATTACK_DAMAGE: float = 15.0
 const PLAYER_KNOCKBACK_FORCE: float = 10.0
@@ -121,10 +127,10 @@ var _force_field_material: ShaderMaterial  # Bubble shader with noise distortion
 
 func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	_setup_attack_hitbox()  # Must be before _create_characters which attaches hitbox to bones
 	_create_characters()
 	_create_lightning_particles()
 	_setup_hit_label()
-	_setup_attack_hitbox()
 
 
 func _create_characters() -> void:
@@ -155,19 +161,30 @@ func _create_characters() -> void:
 	_armed_character = _load_character(ARMED_CHARACTER_PATH, "ArmedCharacter", Color(0.6, 0.5, 0.3))
 	if _armed_character:
 		_character_model.add_child(_armed_character)
-		_armed_character.visible = false  # Start hidden
+		_armed_character.visible = true  # Start visible (armed mode is default)
 		_armed_anim_player = _find_animation_player(_armed_character)
 		if _armed_anim_player:
 			_armed_anim_player.animation_finished.connect(_on_animation_finished)
 			_load_animations_for_character(_armed_anim_player, ARMED_ANIM_PATHS, _get_armed_config(), "armed", _armed_character)
+		# Setup sword hitbox bone attachment after character is loaded
+		_setup_sword_bone_attachment()
 
-	# Set initial animation player
-	_current_anim_player = _unarmed_anim_player
+	# Hide unarmed character since we start in armed mode
+	if _unarmed_character:
+		_unarmed_character.visible = false
 
-	# Play initial idle animation
-	if _unarmed_anim_player and _unarmed_anim_player.has_animation(&"unarmed/Idle"):
-		_unarmed_anim_player.play(&"unarmed/Idle")
-		_current_anim = &"unarmed/Idle"
+	# Set initial animation player (armed mode is default)
+	_current_anim_player = _armed_anim_player
+
+	# Play initial idle animation (armed)
+	if _armed_anim_player and _armed_anim_player.has_animation(&"armed/Idle"):
+		_armed_anim_player.play(&"armed/Idle")
+		_current_anim = &"armed/Idle"
+
+	# Add unarmed hitbox to character model
+	if _character_model and _unarmed_hitbox:
+		_character_model.add_child(_unarmed_hitbox)
+		print("Player: Added unarmed hitbox to character model")
 
 	print("Characters loaded - Unarmed: ", _unarmed_character != null, ", Armed: ", _armed_character != null)
 
@@ -831,6 +848,7 @@ func _get_armed_config() -> Dictionary:
 		"jump": ["Jump", false],
 		"attack1": ["Attack1", false],
 		"attack2": ["Attack2", false],
+		"sword_slash": ["SwordSlash", false],
 		"block": ["Block", true],
 		"sheath": ["Sheath", false],
 		"spell_cast": ["SpellCast", false],
@@ -1165,8 +1183,11 @@ func _do_attack() -> void:
 	enable_attack_hitbox()  # Enable hitbox when attack starts
 
 	if combat_mode == CombatMode.ARMED:
-		attack_combo = (attack_combo + 1) % 2
-		var attack_anim: StringName = &"armed/Attack1" if attack_combo == 0 else &"armed/Attack2"
+		# Use SwordSlash as primary attack, fall back to Attack1/Attack2
+		var attack_anim: StringName = &"armed/SwordSlash"
+		if not _current_anim_player.has_animation(attack_anim):
+			attack_combo = (attack_combo + 1) % 2
+			attack_anim = &"armed/Attack1" if attack_combo == 0 else &"armed/Attack2"
 		if _current_anim_player.has_animation(attack_anim):
 			_current_anim_player.play(attack_anim)
 			_current_anim = attack_anim
@@ -1298,34 +1319,112 @@ func _setup_hit_label() -> void:
 
 
 func _setup_attack_hitbox() -> void:
-	# Create attack hitbox Area3D for melee attacks
+	# Create sword hitbox Area3D for armed attacks
+	# This will be attached to the right hand bone when the armed character is loaded
 	_attack_hitbox = Area3D.new()
-	_attack_hitbox.name = "AttackHitbox"
+	_attack_hitbox.name = "SwordHitbox"
 	_attack_hitbox.collision_layer = 0  # Doesn't collide with anything
 	_attack_hitbox.collision_mask = 2   # Detects enemies (layer 2 - Bobba)
 	_attack_hitbox.monitoring = false   # Start disabled
 
-	# Create collision shape - box in front of player
-	var collision_shape = CollisionShape3D.new()
-	var box = BoxShape3D.new()
-	box.size = Vector3(1.5, 1.5, 2.0)  # Wide and deep for sword swings
-	collision_shape.shape = box
-	collision_shape.position = Vector3(0, 1.0, 1.2)  # In front, at chest height
+	# Create collision shape - capsule for sword blade
+	var sword_shape = CollisionShape3D.new()
+	var capsule = CapsuleShape3D.new()
+	capsule.radius = 0.15
+	capsule.height = 1.2  # Length of sword blade
+	sword_shape.shape = capsule
+	# Rotate to align with sword (pointing outward from hand)
+	sword_shape.rotation_degrees.x = 90
+	sword_shape.position = Vector3(0, 0, 0.6)  # Offset to center of blade
 
-	_attack_hitbox.add_child(collision_shape)
-
-	# Add hitbox to character model so it rotates with the player
-	if _character_model:
-		_character_model.add_child(_attack_hitbox)
-	else:
-		add_child(_attack_hitbox)
+	_attack_hitbox.add_child(sword_shape)
 
 	# Connect signal
 	_attack_hitbox.body_entered.connect(_on_attack_hitbox_body_entered)
 
+	# Create unarmed hitbox for fist attacks
+	_unarmed_hitbox = Area3D.new()
+	_unarmed_hitbox.name = "FistHitbox"
+	_unarmed_hitbox.collision_layer = 0
+	_unarmed_hitbox.collision_mask = 2
+	_unarmed_hitbox.monitoring = false
+
+	# Create collision shape - box in front of player for punch
+	var fist_shape = CollisionShape3D.new()
+	var box = BoxShape3D.new()
+	box.size = Vector3(1.2, 1.2, 1.5)  # Wide and deep for punches
+	fist_shape.shape = box
+	fist_shape.position = Vector3(0, 1.0, 1.0)  # In front, at chest height
+
+	_unarmed_hitbox.add_child(fist_shape)
+	_unarmed_hitbox.body_entered.connect(_on_attack_hitbox_body_entered)
+
+	# Add unarmed hitbox to character model so it rotates with player
+	# (will be added after _character_model is created)
+
+
+func _setup_sword_bone_attachment() -> void:
+	# Attach sword hitbox to the right hand bone of the armed character
+	if _armed_character == null:
+		print("Player: No armed character, adding hitbox to character model")
+		if _character_model:
+			_character_model.add_child(_attack_hitbox)
+			_attack_hitbox.position = Vector3(0, 1.0, 1.0)
+		else:
+			add_child(_attack_hitbox)
+			_attack_hitbox.position = Vector3(0, 1.0, 1.0)
+		return
+
+	var skeleton: Skeleton3D = _find_skeleton(_armed_character)
+	if skeleton == null:
+		print("Player: No skeleton found for sword attachment, using fallback")
+		if _character_model:
+			_character_model.add_child(_attack_hitbox)
+			_attack_hitbox.position = Vector3(0, 1.0, 1.0)
+		return
+
+	# Debug: print all bone names
+	print("Player: Armed skeleton has ", skeleton.get_bone_count(), " bones:")
+	for i in range(skeleton.get_bone_count()):
+		print("  Bone ", i, ": ", skeleton.get_bone_name(i))
+
+	# Find the right hand bone (Mixamo naming convention)
+	var hand_bone_idx: int = skeleton.find_bone("mixamorig_RightHand")
+	if hand_bone_idx == -1:
+		hand_bone_idx = skeleton.find_bone("mixamorig:RightHand")
+	if hand_bone_idx == -1:
+		# Try alternative names
+		for i in range(skeleton.get_bone_count()):
+			var bone_name = skeleton.get_bone_name(i)
+			if "RightHand" in bone_name or "Right_Hand" in bone_name or "right_hand" in bone_name.to_lower():
+				hand_bone_idx = i
+				break
+
+	if hand_bone_idx == -1:
+		print("Player: Right hand bone not found, using fallback position")
+		# Fallback: add hitbox to character model
+		if _character_model:
+			_character_model.add_child(_attack_hitbox)
+			_attack_hitbox.position = Vector3(0, 1.0, 1.0)
+		return
+
+	print("Player: Found right hand bone at index ", hand_bone_idx, ": ", skeleton.get_bone_name(hand_bone_idx))
+
+	# Create BoneAttachment3D for the sword
+	_sword_bone_attachment = BoneAttachment3D.new()
+	_sword_bone_attachment.name = "SwordAttachment"
+	_sword_bone_attachment.bone_name = skeleton.get_bone_name(hand_bone_idx)
+
+	skeleton.add_child(_sword_bone_attachment)
+	_sword_bone_attachment.add_child(_attack_hitbox)
+	print("Player: Attached sword hitbox to bone: ", skeleton.get_bone_name(hand_bone_idx))
+
 
 func _on_attack_hitbox_body_entered(body: Node3D) -> void:
+	print("Player: Sword hitbox detected body: ", body.name, " (class: ", body.get_class(), ")")
+
 	if _has_hit_this_attack:
+		print("Player: Already hit this attack, ignoring")
 		return
 
 	# Check if we hit an enemy with take_hit method
@@ -1338,16 +1437,51 @@ func _on_attack_hitbox_body_entered(body: Node3D) -> void:
 
 		# Apply damage and knockback
 		body.take_hit(PLAYER_ATTACK_DAMAGE, knockback_dir * PLAYER_KNOCKBACK_FORCE, false)
-		print("Player hit enemy: ", body.name)
+		print("Player: HIT LANDED on enemy: ", body.name)
+	else:
+		print("Player: Body has no take_hit method")
 
 
 func enable_attack_hitbox() -> void:
+	# Don't immediately enable - will be enabled based on animation progress
 	_has_hit_this_attack = false
-	_attack_hitbox.monitoring = true
+	_attack_anim_progress = 0.0
+	print("Player: Attack started, hitbox will enable at ", SWORD_HITBOX_START * 100, "% progress")
 
 
 func disable_attack_hitbox() -> void:
 	_attack_hitbox.monitoring = false
+	if _unarmed_hitbox:
+		_unarmed_hitbox.monitoring = false
+	_attack_anim_progress = 0.0
+	print("Player: Attack ended, hitbox disabled")
+
+
+func _update_attack_hitbox_timing() -> void:
+	# Track attack animation progress and enable hitbox only during middle-to-end
+	if not is_attacking or _current_anim_player == null:
+		return
+
+	# Calculate animation progress (0.0 to 1.0)
+	var anim_length: float = _current_anim_player.current_animation_length
+	var anim_position: float = _current_anim_player.current_animation_position
+	if anim_length > 0:
+		_attack_anim_progress = anim_position / anim_length
+	else:
+		_attack_anim_progress = 0.0
+
+	# Select the correct hitbox based on combat mode
+	var active_hitbox: Area3D = _attack_hitbox if combat_mode == CombatMode.ARMED else _unarmed_hitbox
+
+	# Enable hitbox during the active attack portion (middle to end)
+	var should_be_active: bool = _attack_anim_progress >= SWORD_HITBOX_START and _attack_anim_progress <= SWORD_HITBOX_END
+
+	if should_be_active and not active_hitbox.monitoring:
+		active_hitbox.monitoring = true
+		print("Player: Attack hitbox ENABLED at progress ", _attack_anim_progress, " (mode: ", "armed" if combat_mode == CombatMode.ARMED else "unarmed", ")")
+	elif not should_be_active and active_hitbox.monitoring:
+		active_hitbox.monitoring = false
+		print("Player: Attack hitbox DISABLED at progress ", _attack_anim_progress)
 
 
 func _show_hit_label() -> void:
@@ -1370,15 +1504,25 @@ func _show_hit_label() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	# Toggle fullscreen with F11
+	if event is InputEventKey and event.pressed and event.keycode == KEY_F11:
+		if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		else:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
 	# Quit with Q key
 	if event is InputEventKey and event.pressed and event.keycode == KEY_Q:
 		get_tree().quit()
 
-	# Toggle mouse capture with Escape
-	if event.is_action_pressed("ui_cancel"):
-		if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
-			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-		else:
+	# Release mouse with Escape
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+	# Double-click to recapture mouse
+	if event is InputEventMouseButton and event.pressed and event.double_click and event.button_index == MOUSE_BUTTON_LEFT:
+		if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
 			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 	# Toggle combat mode with Tab, middle mouse button, or gamepad Back button
@@ -1430,6 +1574,9 @@ func _physics_process(delta: float) -> void:
 
 	if _attack_cooldown > 0:
 		_attack_cooldown -= delta
+
+	# Update sword hitbox timing based on attack animation progress
+	_update_attack_hitbox_timing()
 
 	# Handle stun/knockback state
 	if _is_stunned:
@@ -1505,18 +1652,17 @@ func _physics_process(delta: float) -> void:
 			horizontal_velocity = horizontal_velocity.move_toward(movement_direction * current_max_speed, ACCEL * delta)
 		else:
 			horizontal_velocity = horizontal_velocity.move_toward(Vector3.ZERO, DEACCEL * delta)
-
-		# Update character mesh rotation to face movement direction
-		if _character_model and horizontal_velocity.length() > 0.1:
-			var mesh_target_rotation: float = atan2(horizontal_velocity.x, horizontal_velocity.z)
-			var current_rot: float = _character_model.rotation.y
-			_character_model.rotation.y = lerp_angle(current_rot, mesh_target_rotation, 10.0 * delta)
 	else:
 		# Air control
 		if movement_direction.length() > 0.1:
 			horizontal_velocity += movement_direction * (ACCEL * 0.3 * delta)
 			if horizontal_velocity.length() > current_max_speed:
 				horizontal_velocity = horizontal_velocity.normalized() * current_max_speed
+
+	# Always rotate character to face camera/mouse direction (strafe-style movement)
+	if _character_model:
+		var mesh_target_rotation: float = _camera_pivot.rotation.y + PI
+		_character_model.rotation.y = lerp_angle(_character_model.rotation.y, mesh_target_rotation, 12.0 * delta)
 
 	velocity = horizontal_velocity + Vector3.UP * velocity.y
 
