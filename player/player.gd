@@ -131,6 +131,32 @@ func _ready() -> void:
 	_create_characters()
 	_create_lightning_particles()
 	_setup_hit_label()
+	_setup_multiplayer()
+
+
+func _setup_multiplayer() -> void:
+	# Register with network manager if available
+	if has_node("/root/NetworkManager"):
+		var network_manager = get_node("/root/NetworkManager")
+		network_manager.set_local_player(self)
+		# Auto-connect to server
+		network_manager.connect_to_server()
+
+
+## Returns the current player state for network synchronization
+func get_network_state() -> int:
+	if is_attacking:
+		return 3  # STATE_ATTACKING
+	elif is_blocking:
+		return 4  # STATE_BLOCKING
+	elif not is_on_floor():
+		return 5  # STATE_JUMPING
+	elif velocity.length() > 0.5:
+		if is_running:
+			return 2  # STATE_RUNNING
+		else:
+			return 1  # STATE_WALKING
+	return 0  # STATE_IDLE
 
 
 func _create_characters() -> void:
