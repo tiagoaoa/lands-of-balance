@@ -6,4 +6,3 @@ Language: GDScript
 
 Renderer: Forward+
 
-
