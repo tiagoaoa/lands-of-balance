@@ -2,6 +2,7 @@ class_name Dragon
 extends CharacterBody3D
 
 ## Ancient Dragon that patrols the map flying, lands on hills, and attacks nearby players
+## Network-synchronized across all players.
 ##
 ## Behavior:
 ## - Flies in oval patrol pattern around player start area
@@ -16,6 +17,14 @@ enum DragonState { PATROL, FLYING_TO_LAND, LANDING, WAIT, TAKING_OFF, ATTACKING 
 
 signal lap_completed(lap_number: int)
 signal state_changed(new_state: DragonState)
+
+# Network synchronization
+var entity_id: int = 0
+var health: float = 500.0  # Dragon has more health
+var _is_network_controlled: bool = false
+var _target_position: Vector3 = Vector3.ZERO
+var _target_rotation: float = 0.0
+var lap_count: int = 0  # For network sync
 
 # Patrol settings
 @export var patrol_radius: float = 15.0  # Radius of patrol circle
@@ -82,7 +91,36 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_find_player()
 
+	# Setup network
+	_setup_network()
+
 	print("Dragon ready! Animations found: ", _get_animation_list())
+
+
+func _setup_network() -> void:
+	# Generate unique entity ID
+	entity_id = get_instance_id() % 1000000 + 100000  # Offset to avoid collision with Bobba IDs
+
+	# Register with NetworkManager if available
+	if has_node("/root/NetworkManager"):
+		var network_manager = get_node("/root/NetworkManager")
+		network_manager.register_entity(self, network_manager.ENTITY_DRAGON, entity_id)
+
+		# Wait for network manager to determine host status
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_is_network_controlled = not network_manager.is_host
+		if _is_network_controlled:
+			print("Dragon [%d]: Network-controlled (client mode)" % entity_id)
+		else:
+			print("Dragon [%d]: Locally-controlled (host mode)" % entity_id)
+
+
+func _exit_tree() -> void:
+	# Unregister from NetworkManager
+	if has_node("/root/NetworkManager"):
+		var network_manager = get_node("/root/NetworkManager")
+		network_manager.unregister_entity(entity_id)
 
 
 func _setup_dragon_model() -> void:
@@ -270,6 +308,12 @@ func _get_patrol_position() -> Vector3:
 
 
 func _physics_process(delta: float) -> void:
+	# Network-controlled mode: interpolate to received position
+	if _is_network_controlled:
+		_handle_network_interpolation(delta)
+		return
+
+	# Host controls the dragon AI
 	match state:
 		DragonState.PATROL:
 			_process_patrol(delta)
@@ -284,7 +328,62 @@ func _physics_process(delta: float) -> void:
 		DragonState.ATTACKING:
 			_process_attacking(delta)
 
+	# Update lap_count for network sync
+	lap_count = laps_completed
+
 	move_and_slide()
+
+
+## Handle interpolation for network-controlled entities
+func _handle_network_interpolation(delta: float) -> void:
+	const INTERP_SPEED = 8.0
+
+	# Smoothly interpolate to target position
+	global_position = global_position.lerp(_target_position, INTERP_SPEED * delta)
+
+	# Interpolate rotation
+	if _model:
+		_model.rotation.y = lerp_angle(_model.rotation.y, _target_rotation, INTERP_SPEED * delta)
+
+	move_and_slide()
+
+
+## Get network state for synchronization
+func get_network_state() -> int:
+	return state
+
+
+## Apply network state received from host
+func apply_network_state(data: Dictionary) -> void:
+	if not _is_network_controlled:
+		return
+
+	_target_position = data.get("position", global_position)
+	_target_rotation = data.get("rotation_y", _target_rotation)
+
+	var new_state = data.get("state", state)
+	if new_state != state:
+		state = new_state
+		_update_animation_for_state()
+
+	health = data.get("health", health)
+
+	# Extra data for dragon
+	lap_count = data.get("extra1", lap_count)
+	patrol_angle = data.get("extra2", patrol_angle)
+
+
+## Update animation to match current state
+func _update_animation_for_state() -> void:
+	match state:
+		DragonState.PATROL, DragonState.FLYING_TO_LAND, DragonState.TAKING_OFF:
+			_play_animation(anim_fly, true)
+		DragonState.LANDING:
+			_play_animation(anim_land, false)
+		DragonState.WAIT:
+			_play_animation(anim_idle, true)
+		DragonState.ATTACKING:
+			_play_animation(anim_attack, false)
 
 
 func _process_patrol(delta: float) -> void:

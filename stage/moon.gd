@@ -9,8 +9,8 @@ extends Node3D
 @export var moon_elevation: float = 30.0  ## Degrees above horizon
 @export var moon_azimuth: float = -45.0  ## Degrees from north (Y rotation)
 
-@export var light_energy: float = 0.6  ## Moon light intensity (main light source at night)
-@export var light_color: Color = Color(0.75, 0.8, 0.9)  ## Cool bluish moonlight
+@export var light_energy: float = 0.7  ## Moon light intensity (Diablo IV style)
+@export var light_color: Color = Color(0.5, 0.55, 0.75)  ## Cool blue-purple moonlight (Diablo IV)
 
 var _moon_mesh: MeshInstance3D
 var _moon_light: DirectionalLight3D
@@ -71,10 +71,17 @@ func _create_moon_light() -> void:
 	_moon_light.name = "MoonLight"
 	_moon_light.light_color = light_color
 	_moon_light.light_energy = light_energy
-	_moon_light.light_indirect_energy = 0.1
+	_moon_light.light_indirect_energy = 0.4  # Colored bounce light for GI
+	_moon_light.light_volumetric_fog_energy = 1.0  # Moon visible in volumetric fog
 	_moon_light.shadow_enabled = true
-	_moon_light.shadow_bias = 0.03
-	_moon_light.shadow_opacity = 0.5  # Softer shadows for moonlight
+	_moon_light.shadow_blur = 2.0  # Soft shadow edges (Diablo IV style)
+	_moon_light.shadow_bias = 0.04
+	_moon_light.shadow_normal_bias = 1.5  # Reduce peter-panning
+	_moon_light.shadow_opacity = 0.85  # Strong but not harsh shadows
+	# Cascaded shadows for quality
+	_moon_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	_moon_light.directional_shadow_max_distance = 150.0
+	_moon_light.directional_shadow_blend_splits = true  # Smooth cascade transitions
 
 	add_child(_moon_light)
 

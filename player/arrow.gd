@@ -2,6 +2,7 @@ extends RigidBody3D
 class_name Arrow
 
 ## Fire arrow projectile with parabolic trajectory
+## Network-synchronized across all players
 
 const ARROW_SPEED: float = 50.0
 const GRAVITY: float = 9.8
@@ -9,6 +10,9 @@ const LIFETIME: float = 10.0
 const DAMAGE: float = 25.0
 
 var shooter: Node3D = null
+var shooter_id: int = 0  # Network player ID of shooter
+var arrow_id: int = 0    # Unique network ID for this arrow
+var is_local: bool = true  # True if spawned locally, false if from network
 var _lifetime_timer: float = 0.0
 var _has_hit: bool = false
 
@@ -245,12 +249,20 @@ func _on_body_entered(body: Node) -> void:
 	freeze = true
 
 	# Deal damage if applicable
+	var hit_entity_id: int = 0
 	if body.has_method("take_damage"):
 		body.take_damage(DAMAGE, shooter)
+		if "entity_id" in body:
+			hit_entity_id = body.entity_id
 
 	# Stop fire effect but keep some embers
 	_fire_particles.emitting = false
 	_trail_particles.emitting = false
+
+	# Broadcast hit event to network (only for local arrows)
+	if is_local and has_node("/root/NetworkManager"):
+		var network_manager = get_node("/root/NetworkManager")
+		network_manager.send_arrow_hit(arrow_id, global_position, hit_entity_id)
 
 	# Create ground fire illumination (5m range fireplace light)
 	_create_ground_fire()

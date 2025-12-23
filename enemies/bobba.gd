@@ -2,10 +2,18 @@ class_name Bobba
 extends CharacterBody3D
 ## Bobba - A roaming creature that attacks when the player gets close.
 ## Roams around the map randomly, switches to attack mode within 10 meters of player.
+## Network-synchronized across all players.
 
 signal attack_landed(target: Node3D, knockback_direction: Vector3)
 
 enum State { ROAMING, CHASING, ATTACKING, IDLE, STUNNED }
+
+# Network synchronization
+var entity_id: int = 0  # Unique ID for network sync
+var health: float = 100.0
+var _is_network_controlled: bool = false  # True for non-host clients
+var _target_position: Vector3 = Vector3.ZERO
+var _target_rotation: float = 0.0
 
 const ROAM_SPEED: float = 2.0
 const CHASE_SPEED: float = 5.0
@@ -61,6 +69,34 @@ func _ready() -> void:
 	_setup_model()
 	_setup_hit_label()
 	_pick_new_roam_direction()
+	_setup_network()
+
+
+func _setup_network() -> void:
+	# Generate unique entity ID from instance ID
+	entity_id = get_instance_id() % 1000000  # Keep it reasonable size
+
+	# Register with NetworkManager if available
+	if has_node("/root/NetworkManager"):
+		var network_manager = get_node("/root/NetworkManager")
+		network_manager.register_entity(self, network_manager.ENTITY_BOBBA, entity_id)
+
+		# Check if we're the host - if not, we're network-controlled
+		# Wait a frame for the network manager to determine host status
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_is_network_controlled = not network_manager.is_host
+		if _is_network_controlled:
+			print("Bobba [%d]: Network-controlled (client mode)" % entity_id)
+		else:
+			print("Bobba [%d]: Locally-controlled (host mode)" % entity_id)
+
+
+func _exit_tree() -> void:
+	# Unregister from NetworkManager
+	if has_node("/root/NetworkManager"):
+		var network_manager = get_node("/root/NetworkManager")
+		network_manager.unregister_entity(entity_id)
 
 
 func _find_player() -> void:
@@ -617,6 +653,11 @@ func _physics_process(delta: float) -> void:
 	# Update hand hitbox timing based on attack animation progress
 	_update_attack_hitbox_timing()
 
+	# Network-controlled mode: interpolate to received position
+	if _is_network_controlled:
+		_handle_network_interpolation(delta)
+		return
+
 	# Apply gravity
 	velocity += gravity * delta
 
@@ -625,7 +666,7 @@ func _physics_process(delta: float) -> void:
 	if player and is_instance_valid(player):
 		distance_to_player = global_position.distance_to(player.global_position)
 
-	# State machine
+	# State machine (host only)
 	match state:
 		State.ROAMING:
 			_handle_roaming(delta, distance_to_player)
@@ -639,6 +680,61 @@ func _physics_process(delta: float) -> void:
 			_handle_stunned(delta)
 
 	move_and_slide()
+
+
+## Handle interpolation for network-controlled entities
+func _handle_network_interpolation(delta: float) -> void:
+	# Smoothly interpolate to target position
+	const INTERP_SPEED = 10.0
+	global_position = global_position.lerp(_target_position, INTERP_SPEED * delta)
+
+	# Interpolate rotation
+	if _model:
+		_model.rotation.y = lerp_angle(_model.rotation.y, _target_rotation, INTERP_SPEED * delta)
+
+	# Apply gravity (still needed even in network mode)
+	if not is_on_floor():
+		velocity.y -= 22.0 * delta
+	else:
+		velocity.y = 0
+	move_and_slide()
+
+
+## Get network state for synchronization (called by NetworkManager)
+func get_network_state() -> int:
+	return state
+
+
+## Apply network state received from host (called by NetworkManager on clients)
+func apply_network_state(data: Dictionary) -> void:
+	if not _is_network_controlled:
+		return  # Host doesn't apply network state
+
+	_target_position = data.get("position", global_position)
+	_target_rotation = data.get("rotation_y", _target_rotation)
+
+	var new_state = data.get("state", state)
+	if new_state != state:
+		state = new_state
+		# Update animation based on new state
+		_update_animation_for_state()
+
+	health = data.get("health", health)
+
+
+## Update animation to match current state
+func _update_animation_for_state() -> void:
+	match state:
+		State.ROAMING:
+			_play_anim(&"bobba/Walk")
+		State.CHASING:
+			_play_anim(&"bobba/Run")
+		State.ATTACKING:
+			_play_anim(&"bobba/Attack")
+		State.IDLE:
+			_play_anim(&"bobba/Idle")
+		State.STUNNED:
+			_play_anim(&"bobba/Idle")
 
 
 func _handle_roaming(delta: float, distance_to_player: float) -> void:

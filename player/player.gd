@@ -8,6 +8,9 @@ extends CharacterBody3D
 # Lightning addon preloads
 const Lightning3DBranchedClass = preload("res://addons/lightning/generators/Lightning3DBranched.gd")
 
+## Enable multiplayer networking (set to false for singleplayer testing)
+@export var enable_multiplayer: bool = false
+
 const WALK_SPEED: float = 3.5
 const RUN_SPEED: float = 7.0
 const ACCEL: float = 12.0
@@ -170,16 +173,146 @@ func _ready() -> void:
 
 
 func _setup_multiplayer() -> void:
+	# Skip multiplayer setup if disabled (singleplayer mode)
+	if not enable_multiplayer:
+		print("Player: Multiplayer disabled - running in singleplayer mode")
+		return
+
 	# Register with network manager if available
 	print("Player: _setup_multiplayer called")
 	if has_node("/root/NetworkManager"):
 		print("Player: Found NetworkManager, connecting...")
 		var network_manager = get_node("/root/NetworkManager")
 		network_manager.set_local_player(self)
+		# Connect to arrow spawn signal to create arrows from other players
+		network_manager.arrow_spawned.connect(_on_network_arrow_spawned)
+		# Connect to arrow hit signal to create ground fire for remote arrows
+		network_manager.arrow_hit.connect(_on_network_arrow_hit)
 		# Auto-connect to server
 		network_manager.connect_to_server()
 	else:
 		print("Player: NetworkManager NOT found!")
+
+
+## Handle arrow spawn event from network (another player shot an arrow)
+func _on_network_arrow_spawned(data: Dictionary) -> void:
+	# Create arrow from network data
+	var arrow = ArrowScene.instantiate()
+	arrow.is_local = false
+	arrow.arrow_id = data.get("arrow_id", 0)
+	arrow.shooter_id = data.get("shooter_id", 0)
+
+	var spawn_pos: Vector3 = data.get("position", Vector3.ZERO)
+	var direction: Vector3 = data.get("direction", Vector3.FORWARD)
+
+	# Find shooter node (remote player or ourselves, though we filter our own)
+	if has_node("/root/NetworkManager"):
+		var network_manager = get_node("/root/NetworkManager")
+		if arrow.shooter_id in network_manager.remote_players:
+			arrow.shooter = network_manager.remote_players[arrow.shooter_id]
+
+	# Add arrow to scene
+	get_tree().current_scene.add_child(arrow)
+	arrow.global_position = spawn_pos
+	arrow.launch(direction)
+
+	print("Network arrow spawned: id=%d from player %d" % [arrow.arrow_id, arrow.shooter_id])
+
+
+## Handle arrow hit event from network (creates ground fire at hit position)
+func _on_network_arrow_hit(arrow_id: int, hit_pos: Vector3, hit_entity_id: int) -> void:
+	print("Network arrow hit: id=%d at pos=(%.1f, %.1f, %.1f)" % [arrow_id, hit_pos.x, hit_pos.y, hit_pos.z])
+	# Create ground fire effect at hit position
+	_create_network_ground_fire(hit_pos)
+
+
+## Creates a ground fire effect at a network-synced position
+func _create_network_ground_fire(pos: Vector3) -> void:
+	# Create a persistent fire light at landing position
+	var fire_node = Node3D.new()
+	fire_node.name = "NetworkGroundFire"
+	get_tree().current_scene.add_child(fire_node)
+	fire_node.global_position = pos
+
+	# Main fireplace light - intense warm glow with 5m radius
+	var ground_light = OmniLight3D.new()
+	ground_light.name = "FireplaceLight"
+	ground_light.light_color = Color(1.0, 0.5, 0.1)
+	ground_light.light_energy = 500.0
+	ground_light.omni_range = 5.0
+	ground_light.omni_attenuation = 0.8
+	ground_light.shadow_enabled = true
+	ground_light.position = Vector3(0, 0.5, 0)
+	fire_node.add_child(ground_light)
+
+	# Secondary fill light
+	var fill_light = OmniLight3D.new()
+	fill_light.name = "FillLight"
+	fill_light.light_color = Color(1.0, 0.7, 0.3)
+	fill_light.light_energy = 200.0
+	fill_light.omni_range = 8.0
+	fill_light.omni_attenuation = 1.5
+	fill_light.shadow_enabled = false
+	fill_light.position = Vector3(0, 1.0, 0)
+	fire_node.add_child(fill_light)
+
+	# Fire particles
+	var ground_fire = GPUParticles3D.new()
+	ground_fire.name = "GroundFireParticles"
+	ground_fire.amount = 80
+	ground_fire.lifetime = 0.8
+	ground_fire.explosiveness = 0.1
+	ground_fire.randomness = 0.6
+
+	var fire_mat = ParticleProcessMaterial.new()
+	fire_mat.direction = Vector3(0, 1, 0)
+	fire_mat.spread = 35.0
+	fire_mat.initial_velocity_min = 1.0
+	fire_mat.initial_velocity_max = 4.0
+	fire_mat.gravity = Vector3(0, 3.0, 0)
+	fire_mat.scale_min = 0.3
+	fire_mat.scale_max = 0.8
+
+	var color_ramp = GradientTexture1D.new()
+	var gradient = Gradient.new()
+	gradient.add_point(0.0, Color(1.0, 1.0, 0.5, 1.0))
+	gradient.add_point(0.3, Color(1.0, 0.8, 0.2, 1.0))
+	gradient.add_point(0.6, Color(1.0, 0.4, 0.0, 0.9))
+	gradient.add_point(1.0, Color(0.8, 0.1, 0.0, 0.0))
+	color_ramp.gradient = gradient
+	fire_mat.color_ramp = color_ramp
+	fire_mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	fire_mat.emission_sphere_radius = 0.4
+
+	ground_fire.process_material = fire_mat
+
+	var fire_mesh = QuadMesh.new()
+	fire_mesh.size = Vector2(0.5, 0.5)
+	var mesh_mat = StandardMaterial3D.new()
+	mesh_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mesh_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mesh_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	mesh_mat.albedo_color = Color(1.0, 0.8, 0.3, 1.0)
+	mesh_mat.emission_enabled = true
+	mesh_mat.emission = Color(1.0, 0.6, 0.1)
+	mesh_mat.emission_energy_multiplier = 5.0
+	fire_mesh.material = mesh_mat
+
+	ground_fire.draw_pass_1 = fire_mesh
+	ground_fire.position = Vector3(0, 0.2, 0)
+	fire_node.add_child(ground_fire)
+
+	# Add light flickering effect
+	var flicker_tween = fire_node.create_tween()
+	flicker_tween.set_loops()
+	flicker_tween.tween_property(ground_light, "light_energy", 600.0, 0.1)
+	flicker_tween.tween_property(ground_light, "light_energy", 400.0, 0.15)
+	flicker_tween.tween_property(ground_light, "light_energy", 550.0, 0.08)
+	flicker_tween.tween_property(ground_light, "light_energy", 450.0, 0.12)
+
+	# Auto-destroy after 30 seconds
+	var destroy_timer = get_tree().create_timer(30.0)
+	destroy_timer.timeout.connect(fire_node.queue_free)
 
 
 ## Returns the current player state for network synchronization
@@ -201,6 +334,13 @@ func get_network_state() -> int:
 ## Returns the current animation name for network synchronization
 func get_current_animation() -> String:
 	return str(_current_anim)
+
+
+## Returns the character model's facing direction for network synchronization
+func get_facing_rotation() -> float:
+	if _character_model:
+		return _character_model.rotation.y
+	return 0.0
 
 
 func _create_characters() -> void:
@@ -1350,6 +1490,7 @@ func _shoot_arrow() -> void:
 	# Create arrow instance
 	var arrow = ArrowScene.instantiate()
 	arrow.shooter = self
+	arrow.is_local = true
 
 	# Get camera direction for aiming
 	var camera = _camera_pivot.get_node("Camera3D") as Camera3D
@@ -1361,6 +1502,12 @@ func _shoot_arrow() -> void:
 
 	# Add some upward arc for parabolic trajectory
 	aim_direction.y += 0.15
+
+	# Broadcast arrow spawn to network
+	if has_node("/root/NetworkManager"):
+		var network_manager = get_node("/root/NetworkManager")
+		arrow.shooter_id = network_manager.my_player_id
+		arrow.arrow_id = network_manager.send_arrow_spawn(spawn_pos, aim_direction, network_manager.my_player_id)
 
 	# Add arrow to scene
 	get_tree().current_scene.add_child(arrow)
@@ -1944,12 +2091,12 @@ func _input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"spell_cast") or event.is_action_pressed(&"cast_spell_rb"):
 		_do_spell_cast()
 
-	# Switch character class: 4 (Archer), 5 (Paladin) - Archer is default
+	# Switch character class: 2 (Paladin), 3 (Archer) - Archer is default
 	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_4:
-			_switch_character_class(CharacterClass.ARCHER)
-		elif event.keycode == KEY_5:
+		if event.keycode == KEY_2:
 			_switch_character_class(CharacterClass.PALADIN)
+		elif event.keycode == KEY_3:
+			_switch_character_class(CharacterClass.ARCHER)
 
 	# Mouse look
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:

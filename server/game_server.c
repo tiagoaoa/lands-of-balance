@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/socket.h>
@@ -23,9 +24,10 @@
 
 #define DEFAULT_PORT 7777
 #define MAX_PLAYERS 32
-#define BUFFER_SIZE 1024
+#define MAX_ENTITIES 64
+#define BUFFER_SIZE 2048
 #define PLAYER_TIMEOUT_SEC 10
-#define BROADCAST_INTERVAL_MS 50
+#define BROADCAST_INTERVAL_MS 16  // ~60fps (1000/60 ≈ 16.67ms)
 
 // Player state flags
 #define STATE_IDLE      0
@@ -36,12 +38,21 @@
 #define STATE_JUMPING   5
 
 // Packet types
-#define PKT_JOIN        1
-#define PKT_LEAVE       2
-#define PKT_UPDATE      3
-#define PKT_WORLD_STATE 4
-#define PKT_PING        5
-#define PKT_PONG        6
+#define PKT_JOIN         1
+#define PKT_LEAVE        2
+#define PKT_UPDATE       3
+#define PKT_WORLD_STATE  4
+#define PKT_PING         5
+#define PKT_PONG         6
+#define PKT_ENTITY_STATE 7   // Host broadcasts entity states (Bobba, Dragon)
+#define PKT_ENTITY_DAMAGE 8  // Client reports damage to entity
+#define PKT_ARROW_SPAWN  9   // Client spawns arrow - relay to others
+#define PKT_ARROW_HIT    10  // Arrow hit event - relay to others
+
+// Entity types
+#define ENTITY_BOBBA     0
+#define ENTITY_DRAGON    1
+#define ENTITY_ARROW     2
 
 #pragma pack(push, 1)
 
@@ -53,6 +64,7 @@ typedef struct {
     uint8_t state;
     uint8_t combat_mode;  // 0 = unarmed, 1 = armed
     float health;
+    char anim_name[32];  // Current animation name
 } PlayerData;
 
 // Network packet header
@@ -80,6 +92,50 @@ typedef struct {
     uint8_t player_count;
     PlayerData players[MAX_PLAYERS];
 } WorldStatePacket;
+
+// Entity data for network sync (Bobba, Dragon)
+typedef struct {
+    uint8_t entity_type;
+    uint32_t entity_id;
+    float pos_x, pos_y, pos_z;
+    float rot_y;
+    uint8_t state;
+    float health;
+    uint32_t extra1;  // Entity-specific (e.g., lap_count for Dragon)
+    float extra2;     // Entity-specific (e.g., patrol_angle for Dragon)
+} EntityData;
+
+// Entity state packet (host -> server -> clients)
+typedef struct {
+    PacketHeader header;
+    uint8_t entity_count;
+    EntityData entities[MAX_ENTITIES];
+} EntityStatePacket;
+
+// Arrow spawn packet (client -> server -> other clients)
+typedef struct {
+    PacketHeader header;
+    uint32_t arrow_id;
+    float pos_x, pos_y, pos_z;
+    float dir_x, dir_y, dir_z;
+    uint32_t shooter_id;
+} ArrowSpawnPacket;
+
+// Arrow hit packet (client -> server -> other clients)
+typedef struct {
+    PacketHeader header;
+    uint32_t arrow_id;
+    float hit_x, hit_y, hit_z;
+    uint32_t hit_entity_id;
+} ArrowHitPacket;
+
+// Entity damage packet (client -> server -> host)
+typedef struct {
+    PacketHeader header;
+    uint32_t entity_id;
+    float damage;
+    uint32_t attacker_id;
+} EntityDamagePacket;
 
 #pragma pack(pop)
 
@@ -114,7 +170,7 @@ void signal_handler(int sig) {
 // Generate random spawn position within 50m of original spawn
 void generate_spawn_position(float *x, float *y, float *z) {
     float angle = ((float)rand() / RAND_MAX) * 2.0f * M_PI;
-    float distance = ((float)rand() / RAND_MAX) * 50.0f;
+    float distance = ((float)rand() / RAND_MAX) * 2.0f;
 
     *x = spawn_x + cos(angle) * distance;
     *y = spawn_y;  // Keep same Y level
@@ -235,6 +291,7 @@ void handle_join(JoinPacket *pkt, struct sockaddr_in *client_addr) {
            player->name, player->player_id,
            player->data.pos_x, player->data.pos_y, player->data.pos_z,
            count_active_players());
+    fflush(stdout);
 
     // Send initial world state to new player
     pthread_mutex_unlock(&players_mutex);
@@ -296,6 +353,96 @@ void cleanup_inactive_players() {
     pthread_mutex_unlock(&players_mutex);
 }
 
+// Relay entity state from host to all other clients
+void relay_entity_state(void *packet, size_t len, struct sockaddr_in *sender_addr) {
+    pthread_mutex_lock(&players_mutex);
+
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (players[i].active) {
+            // Skip the sender (host)
+            if (players[i].addr.sin_addr.s_addr == sender_addr->sin_addr.s_addr &&
+                players[i].addr.sin_port == sender_addr->sin_port) {
+                continue;
+            }
+            sendto(server_socket, packet, len, 0,
+                   (struct sockaddr*)&players[i].addr, sizeof(players[i].addr));
+        }
+    }
+
+    pthread_mutex_unlock(&players_mutex);
+}
+
+// Relay arrow spawn to all clients except sender
+void relay_arrow_spawn(ArrowSpawnPacket *pkt, size_t len, struct sockaddr_in *sender_addr) {
+    pthread_mutex_lock(&players_mutex);
+
+    printf("Relaying arrow spawn (id=%u) from player %u to %d clients\n",
+           pkt->arrow_id, pkt->shooter_id, count_active_players() - 1);
+    fflush(stdout);
+
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (players[i].active) {
+            // Skip the sender
+            if (players[i].addr.sin_addr.s_addr == sender_addr->sin_addr.s_addr &&
+                players[i].addr.sin_port == sender_addr->sin_port) {
+                continue;
+            }
+            sendto(server_socket, pkt, len, 0,
+                   (struct sockaddr*)&players[i].addr, sizeof(players[i].addr));
+        }
+    }
+
+    pthread_mutex_unlock(&players_mutex);
+}
+
+// Relay arrow hit to all clients except sender
+void relay_arrow_hit(ArrowHitPacket *pkt, size_t len, struct sockaddr_in *sender_addr) {
+    pthread_mutex_lock(&players_mutex);
+
+    printf("Relaying arrow hit (id=%u) at (%.1f, %.1f, %.1f)\n",
+           pkt->arrow_id, pkt->hit_x, pkt->hit_y, pkt->hit_z);
+    fflush(stdout);
+
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (players[i].active) {
+            // Skip the sender
+            if (players[i].addr.sin_addr.s_addr == sender_addr->sin_addr.s_addr &&
+                players[i].addr.sin_port == sender_addr->sin_port) {
+                continue;
+            }
+            sendto(server_socket, pkt, len, 0,
+                   (struct sockaddr*)&players[i].addr, sizeof(players[i].addr));
+        }
+    }
+
+    pthread_mutex_unlock(&players_mutex);
+}
+
+// Relay entity damage to host (first/lowest ID player)
+void relay_entity_damage(EntityDamagePacket *pkt, size_t len, struct sockaddr_in *sender_addr) {
+    pthread_mutex_lock(&players_mutex);
+
+    // Find host (lowest player ID)
+    Player *host = NULL;
+    uint32_t lowest_id = UINT32_MAX;
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (players[i].active && players[i].player_id < lowest_id) {
+            lowest_id = players[i].player_id;
+            host = &players[i];
+        }
+    }
+
+    if (host) {
+        printf("Relaying entity damage (entity=%u, damage=%.1f) to host %u\n",
+               pkt->entity_id, pkt->damage, host->player_id);
+        fflush(stdout);
+        sendto(server_socket, pkt, len, 0,
+               (struct sockaddr*)&host->addr, sizeof(host->addr));
+    }
+
+    pthread_mutex_unlock(&players_mutex);
+}
+
 // Broadcast thread - sends world state periodically
 void* broadcast_thread(void *arg) {
     while (running) {
@@ -329,10 +476,15 @@ void* receive_thread(void *arg) {
         }
 
         if (recv_len < sizeof(PacketHeader)) {
+            printf("Received invalid packet (too small: %zd bytes)\n", recv_len);
+            fflush(stdout);
             continue;  // Invalid packet
         }
 
         PacketHeader *header = (PacketHeader*)buffer;
+        printf("Received packet type %d from %s:%d (%zd bytes)\n",
+               header->type, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), recv_len);
+        fflush(stdout);
 
         switch (header->type) {
             case PKT_JOIN:
@@ -360,6 +512,34 @@ void* receive_thread(void *arg) {
                     pong.sequence = header->sequence;
                     sendto(server_socket, &pong, sizeof(pong), 0,
                            (struct sockaddr*)&client_addr, addr_len);
+                }
+                break;
+
+            case PKT_ENTITY_STATE:
+                // Relay entity state from host to all other clients
+                if (recv_len >= sizeof(PacketHeader) + 1) {
+                    relay_entity_state(buffer, recv_len, &client_addr);
+                }
+                break;
+
+            case PKT_ENTITY_DAMAGE:
+                // Relay entity damage to host
+                if (recv_len >= sizeof(EntityDamagePacket)) {
+                    relay_entity_damage((EntityDamagePacket*)buffer, recv_len, &client_addr);
+                }
+                break;
+
+            case PKT_ARROW_SPAWN:
+                // Relay arrow spawn to all other clients
+                if (recv_len >= sizeof(ArrowSpawnPacket)) {
+                    relay_arrow_spawn((ArrowSpawnPacket*)buffer, recv_len, &client_addr);
+                }
+                break;
+
+            case PKT_ARROW_HIT:
+                // Relay arrow hit to all other clients
+                if (recv_len >= sizeof(ArrowHitPacket)) {
+                    relay_arrow_hit((ArrowHitPacket*)buffer, recv_len, &client_addr);
                 }
                 break;
 
@@ -421,6 +601,7 @@ int main(int argc, char *argv[]) {
     printf("Player timeout: %d seconds\n", PLAYER_TIMEOUT_SEC);
     printf("Press Ctrl+C to stop\n");
     printf("===========================================\n\n");
+    fflush(stdout);
 
     // Start broadcast thread
     pthread_t broadcast_tid;
