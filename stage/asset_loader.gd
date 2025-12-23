@@ -9,7 +9,7 @@ enum CollisionType {
 	NONE        ## No collision (decorative objects)
 }
 
-@export_file("*.glb,*.gltf,*.fbx") var asset_path: String = ""
+@export_file("*.glb", "*.gltf", "*.fbx") var asset_path: String = ""
 @export var collision_type: CollisionType = CollisionType.TRIMESH
 @export var scale_factor: Vector3 = Vector3.ONE
 @export var rotation_offset: Vector3 = Vector3.ZERO  ## Degrees

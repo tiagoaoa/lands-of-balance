@@ -18,43 +18,44 @@ var _dir_light: DirectionalLight3D
 var _moon: Node3D
 var _tween: Tween
 
-# Day preset (original bright lighting)
+# Day preset (original bright lighting - reduced 70%)
 const DAY_SETTINGS := {
-	"background_energy": 1.0,
+	"background_energy": 0.3,
 	"ambient_color": Color(0.7, 0.75, 0.8),
-	"ambient_energy": 0.5,
+	"ambient_energy": 0.15,
 	"ambient_sky_contribution": 0.3,
 	"fog_enabled": true,
 	"fog_density": 0.001,
 	"fog_color": Color(0.75, 0.82, 0.9),
-	"fog_light_energy": 1.0,
+	"fog_light_energy": 0.3,
 	"volumetric_fog_enabled": false,
 	"ssao_enabled": false,
 	"adjustment_enabled": false,
 	"glow_enabled": false,
 	"light_color": Color(1.0, 0.95, 0.85),
-	"light_energy": 1.3,
+	"light_energy": 0.39,
 	"light_rotation": Vector3(-45, -45, 0),
 }
 
-# Night preset (moonlit night - moon is the only light source)
-# Fog reduced by 70%, ambient minimal, no directional sun light
+# Night preset (Diablo IV style - oppressive darkness with cool moonlight)
+# Deep blacks, blue-purple moonlight, thick volumetric fog, desaturated look
 const NIGHT_SETTINGS := {
-	"background_energy": 0.02,  # Very dim night sky
-	"ambient_color": Color(0.08, 0.1, 0.15),  # Very dark blue-gray ambient
-	"ambient_energy": 0.05,  # Minimal ambient - moon provides main light
-	"ambient_sky_contribution": 0.0,  # No sky contribution
+	"background_energy": 0.015,  # Very dim ominous sky
+	"ambient_color": Color(0.1, 0.1, 0.18),  # Deep blue-black ambient (Diablo oppressive)
+	"ambient_energy": 0.2,  # Low ambient for deep shadows but readable
+	"ambient_sky_contribution": 0.1,  # Minimal sky contribution
 	"fog_enabled": true,
-	"fog_density": 0.0105,  # Light fog
-	"fog_color": Color(0.15, 0.18, 0.22),  # Dark cool fog
-	"fog_light_energy": 0.02,  # Very dim fog scattering
+	"fog_density": 0.002,  # Subtle distance fog
+	"fog_color": Color(0.1, 0.1, 0.15),  # Dark blue-gray fog
+	"fog_light_energy": 0.1,  # Moon scatters through fog
 	"volumetric_fog_enabled": true,
 	"ssao_enabled": true,
+	"sdfgi_enabled": true,  # Enable SDFGI for dynamic GI
 	"adjustment_enabled": true,
 	"glow_enabled": true,
-	"light_color": Color(0.5, 0.55, 0.65),  # Not used - directional light off
-	"light_energy": 0.0,  # Directional light OFF - moon is only source
-	"light_rotation": Vector3(-10, -45, 0),
+	"light_color": Color(0.5, 0.55, 0.7),  # Cool blue-purple moonlight
+	"light_energy": 0.0,  # Directional light OFF - moon provides light
+	"light_rotation": Vector3(-35, 25, 0),  # Dramatic shadow angle
 }
 
 
@@ -109,56 +110,101 @@ func _apply_lighting() -> void:
 	env.ambient_light_energy = settings.ambient_energy
 	env.ambient_light_sky_contribution = settings.ambient_sky_contribution
 
+	# Tonemap - ACES Filmic for cinematic look
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	if time_of_day == TimeOfDay.NIGHT:
+		env.tonemap_exposure = 1.0  # Balanced exposure
+		env.tonemap_white = 6.0  # Good highlight rolloff
+	else:
+		env.tonemap_exposure = 2.0
+		env.tonemap_white = 8.0
+
 	# Fog
 	env.fog_enabled = settings.fog_enabled
 	env.fog_density = settings.fog_density
 	env.fog_light_color = settings.fog_color
 	env.fog_light_energy = settings.fog_light_energy
+	if time_of_day == TimeOfDay.NIGHT:
+		env.fog_sun_scatter = 0.2  # Moonlight scatters through fog
 
-	# Volumetric fog (night only) - heavy mist for eerie atmosphere
-	# Reduced by 70%
+	# Volumetric fog (night only) - Diablo IV thick atmospheric haze
 	env.volumetric_fog_enabled = settings.volumetric_fog_enabled
 	if settings.volumetric_fog_enabled:
-		env.volumetric_fog_density = 0.015  # Dense fog reduced 70% (0.05 * 0.3)
-		env.volumetric_fog_albedo = Color(0.35, 0.4, 0.45)  # Cool gray mist
-		env.volumetric_fog_emission = Color(0.02, 0.025, 0.03)
-		env.volumetric_fog_emission_energy = 0.045  # Subtle glow reduced 70%
-		env.volumetric_fog_length = 60.0  # Fog visible range
+		env.volumetric_fog_density = 0.04  # Thick fog for atmosphere
+		env.volumetric_fog_albedo = Color(0.15, 0.17, 0.22)  # Dark blue-gray mist
+		env.volumetric_fog_emission = Color(0.0, 0.0, 0.0)  # No self-emission
+		env.volumetric_fog_emission_energy = 0.0
+		env.volumetric_fog_gi_inject = 0.8  # Catch GI for colored light scatter
+		env.volumetric_fog_anisotropy = 0.5  # Forward scattering toward camera
+		env.volumetric_fog_length = 120.0  # Long fog distance for depth
+		env.volumetric_fog_detail_spread = 0.8
+		env.volumetric_fog_ambient_inject = 0.0  # No ambient in fog
 
-	# SSAO (night only) - harsh shadows on ground and tree bases
+	# SDFGI - Real-time global illumination for dynamic colored bounce light
+	if settings.get("sdfgi_enabled", false):
+		env.sdfgi_enabled = true
+		env.sdfgi_use_occlusion = true
+		env.sdfgi_cascades = 4
+		env.sdfgi_min_cell_size = 0.5
+		env.sdfgi_energy = 1.0
+		env.sdfgi_bounce_feedback = 0.4
+		env.sdfgi_normal_bias = 1.1
+		env.sdfgi_probe_bias = 1.1
+	else:
+		env.sdfgi_enabled = false
+
+	# SSAO - Deep contact shadows for Diablo-style depth
 	env.ssao_enabled = settings.ssao_enabled
 	if settings.ssao_enabled:
-		env.ssao_radius = 2.5
-		env.ssao_intensity = 2.0  # Strong shadows for contrast
+		env.ssao_radius = 1.0  # Tight for less noise
+		env.ssao_intensity = 2.5  # Strong shadows
+		env.ssao_power = 1.5
+		env.ssao_detail = 0.5
+		env.ssao_light_affect = 0.3  # Visible even in lit areas
 
-	# Color adjustment (night only) - cool desaturated look
-	# Brightness reduced by 50%
+	# Color adjustment - Diablo IV desaturated blue-toned grading
 	env.adjustment_enabled = settings.adjustment_enabled
 	if settings.adjustment_enabled:
-		env.adjustment_brightness = 0.425  # Dim overall (50% of 0.85)
-		env.adjustment_contrast = 1.25  # High contrast
-		env.adjustment_saturation = 0.4  # Desaturated, cool tones
+		env.adjustment_brightness = 0.95  # Slight reduction
+		env.adjustment_contrast = 1.2  # Punch up shadows vs highlights
+		env.adjustment_saturation = 0.75  # Desaturated gritty look
 
-	# Glow (night only) - ethereal haze effect
-	# Reduced by 50%
+	# Glow - Subtle bloom on torches and emissives
 	env.glow_enabled = settings.glow_enabled
 	if settings.glow_enabled:
-		env.glow_intensity = 0.15  # 50% of 0.3
-		env.glow_strength = 0.3  # 50% of 0.6
-		env.glow_bloom = 0.075  # 50% of 0.15
+		env.glow_intensity = 0.5
+		env.glow_strength = 1.0
+		env.glow_bloom = 0.15
 		env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+		env.glow_hdr_threshold = 1.0  # Only bright sources bloom
+		env.glow_hdr_scale = 2.0
+		# Enable multiple glow levels for soft halos
+		env.set_glow_level(0, true)
+		env.set_glow_level(1, true)
+		env.set_glow_level(2, false)
+		env.set_glow_level(3, true)
+		env.set_glow_level(4, false)
+		env.set_glow_level(5, false)
+		env.set_glow_level(6, false)
 
-	# Directional light
+	# Directional light (sun - off at night, moon handles lighting)
 	if _dir_light:
 		_dir_light.light_color = settings.light_color
 		_dir_light.light_energy = settings.light_energy
 		_dir_light.rotation_degrees = settings.light_rotation
 
-	# Moon visibility - only show at night
-	if _moon and _moon.has_method("set_visible_mode"):
-		_moon.set_visible_mode(time_of_day == TimeOfDay.NIGHT)
-	elif _moon:
-		_moon.visible = (time_of_day == TimeOfDay.NIGHT)
+	# Moon visibility and settings - only show at night
+	if _moon:
+		if _moon.has_method("set_visible_mode"):
+			_moon.set_visible_mode(time_of_day == TimeOfDay.NIGHT)
+		else:
+			_moon.visible = (time_of_day == TimeOfDay.NIGHT)
+		# Apply Diablo IV moonlight settings
+		if time_of_day == TimeOfDay.NIGHT:
+			if _moon.has_method("set_light_color"):
+				_moon.set_light_color(Color(0.5, 0.55, 0.75))  # Cool blue-purple
+			if _moon.has_method("set_light_energy"):
+				_moon.set_light_energy(0.7)  # Strong enough to cast shadows
 
 
 func _transition_lighting() -> void:
@@ -186,25 +232,12 @@ func _transition_lighting() -> void:
 		_tween.parallel().tween_property(_dir_light, "rotation_degrees", settings.light_rotation, transition_duration)
 
 	# Toggle boolean properties at halfway point
-	# Values reduced: fog 70%, lighting 50%
+	# Note: Detailed values are already set by _apply_lighting() which runs before transition
 	_tween.tween_callback(func():
 		env.volumetric_fog_enabled = settings.volumetric_fog_enabled
 		env.ssao_enabled = settings.ssao_enabled
 		env.adjustment_enabled = settings.adjustment_enabled
 		env.glow_enabled = settings.glow_enabled
-		if settings.volumetric_fog_enabled:
-			env.volumetric_fog_density = 0.015  # 70% reduction
-			env.volumetric_fog_albedo = Color(0.35, 0.4, 0.45)
-		if settings.ssao_enabled:
-			env.ssao_radius = 2.5
-			env.ssao_intensity = 2.0
-		if settings.adjustment_enabled:
-			env.adjustment_brightness = 0.425  # 50% reduction
-			env.adjustment_contrast = 1.25
-			env.adjustment_saturation = 0.4
-		if settings.glow_enabled:
-			env.glow_intensity = 0.15  # 50% reduction
-			env.glow_strength = 0.3  # 50% reduction
 	).set_delay(transition_duration * 0.5)
 
 

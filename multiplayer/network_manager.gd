@@ -1,5 +1,4 @@
 extends Node
-class_name NetworkManager
 
 ## UDP Multiplayer Network Manager
 ## Handles communication with the game server
@@ -10,7 +9,7 @@ signal player_joined(player_id: int, player_data: Dictionary)
 signal player_left(player_id: int)
 signal world_state_received(players: Array)
 
-const DEFAULT_SERVER_IP = "scherbius.vitorpy.com"
+const DEFAULT_SERVER_IP = "65.109.48.183"  # scherbius.vitorpy.com
 const DEFAULT_SERVER_PORT = 7777
 
 # Packet types (must match server)
@@ -47,6 +46,7 @@ const UPDATE_INTERVAL: float = 0.05  # 20 updates per second
 func _ready() -> void:
 	# Generate random player name
 	player_name = "Player_%d" % (randi() % 10000)
+	print("NetworkManager: Ready, player name: ", player_name)
 
 
 func _process(delta: float) -> void:
@@ -64,6 +64,7 @@ func _process(delta: float) -> void:
 
 
 func connect_to_server(ip: String = "", port: int = 0) -> bool:
+	print("NetworkManager: connect_to_server called")
 	if ip.is_empty():
 		ip = server_ip
 	if port == 0:
@@ -72,6 +73,7 @@ func connect_to_server(ip: String = "", port: int = 0) -> bool:
 	server_ip = ip
 	server_port = port
 
+	print("NetworkManager: Creating UDP socket to %s:%d" % [ip, port])
 	socket = PacketPeerUDP.new()
 	var err = socket.connect_to_host(ip, port)
 
@@ -79,7 +81,7 @@ func connect_to_server(ip: String = "", port: int = 0) -> bool:
 		print("NetworkManager: Failed to connect to %s:%d - Error: %d" % [ip, port, err])
 		return false
 
-	print("NetworkManager: Connecting to %s:%d" % [ip, port])
+	print("NetworkManager: Socket connected to %s:%d" % [ip, port])
 
 	# Send join packet
 	_send_join()
@@ -114,6 +116,7 @@ func set_local_player(player: Node3D) -> void:
 
 
 func _send_join() -> void:
+	print("NetworkManager: _send_join called")
 	var buffer = PackedByteArray()
 	buffer.resize(41)  # 1 + 4 + 4 + 32 = 41 bytes
 
@@ -127,8 +130,8 @@ func _send_join() -> void:
 	for i in range(min(name_bytes.size(), 31)):
 		buffer.encode_u8(9 + i, name_bytes[i])
 
-	socket.put_packet(buffer)
-	print("NetworkManager: Sent join request as '%s'" % player_name)
+	var err = socket.put_packet(buffer)
+	print("NetworkManager: Sent join packet (%d bytes), result: %d" % [buffer.size(), err])
 
 
 func _send_leave() -> void:
@@ -148,7 +151,7 @@ func _send_update() -> void:
 		return
 
 	var buffer = PackedByteArray()
-	buffer.resize(9 + 30)  # Header + PlayerData
+	buffer.resize(9 + 62)  # Header (9) + PlayerData (30 + 32 for anim_name)
 
 	# Header
 	buffer.encode_u8(0, PKT_UPDATE)
@@ -187,10 +190,10 @@ func _send_update() -> void:
 	offset += 1
 
 	# Combat mode
-	var combat_mode = 1  # Armed by default
+	var combat_mode_val = 1  # Armed by default
 	if "combat_mode" in local_player:
-		combat_mode = local_player.combat_mode
-	buffer.encode_u8(offset, combat_mode)
+		combat_mode_val = local_player.combat_mode
+	buffer.encode_u8(offset, combat_mode_val)
 	offset += 1
 
 	# Health
@@ -198,6 +201,17 @@ func _send_update() -> void:
 	if "health" in local_player:
 		health = local_player.health
 	buffer.encode_float(offset, health)
+	offset += 4
+
+	# Animation name (32 bytes, null-padded)
+	var anim_name = "Idle"
+	if local_player.has_method("get_current_animation"):
+		anim_name = local_player.get_current_animation()
+	elif "_current_anim" in local_player:
+		anim_name = str(local_player._current_anim)
+	var anim_bytes = anim_name.to_utf8_buffer()
+	for i in range(min(anim_bytes.size(), 31)):
+		buffer.encode_u8(offset + i, anim_bytes[i])
 
 	socket.put_packet(buffer)
 
@@ -223,7 +237,7 @@ func _handle_world_state(packet: PackedByteArray) -> void:
 
 	var player_count = packet.decode_u8(9)
 	var offset = 10
-	var player_data_size = 30  # Size of PlayerData struct
+	var player_data_size = 62  # Size of PlayerData struct (30 + 32 for anim_name)
 
 	var received_ids: Array[int] = []
 	var players_array: Array = []
@@ -241,6 +255,16 @@ func _handle_world_state(packet: PackedByteArray) -> void:
 		var combat_mode = packet.decode_u8(offset + 21)
 		var health = packet.decode_float(offset + 22)
 
+		# Read animation name (32 bytes starting at offset + 26)
+		var anim_bytes = packet.slice(offset + 26, offset + 26 + 32)
+		var anim_name = ""
+		for b in anim_bytes:
+			if b == 0:
+				break
+			anim_name += char(b)
+		if anim_name.is_empty():
+			anim_name = "Idle"
+
 		offset += player_data_size
 		received_ids.append(player_id)
 
@@ -250,7 +274,8 @@ func _handle_world_state(packet: PackedByteArray) -> void:
 			"rotation_y": rot_y,
 			"state": state,
 			"combat_mode": combat_mode,
-			"health": health
+			"health": health,
+			"anim_name": anim_name
 		}
 		players_array.append(data)
 

@@ -21,9 +21,18 @@ const RUN_THRESHOLD: float = 0.6  # Stick intensity threshold for running (60%)
 # Combat mode enum
 enum CombatMode { UNARMED, ARMED }
 
-# Character model paths
+# Character class enum
+enum CharacterClass { PALADIN, ARCHER }
+
+# Arrow projectile
+const ArrowScene = preload("res://player/arrow.tscn")
+
+# Character model paths - Paladin
 const UNARMED_CHARACTER_PATH: String = "res://player/character/unarmed/Paladin.fbx"
 const ARMED_CHARACTER_PATH: String = "res://player/character/armed/Paladin.fbx"
+
+# Character model paths - Archer
+const ARCHER_CHARACTER_PATH: String = "res://player/character/archer/Archer.fbx"
 
 # Unarmed animations (Paladin without weapons)
 const UNARMED_ANIM_PATHS: Dictionary = {
@@ -55,17 +64,34 @@ const ARMED_ANIM_PATHS: Dictionary = {
 	"spell_cast": "res://player/character/armed/SpellCast.fbx",
 }
 
+# Archer animations
+const ARCHER_ANIM_PATHS: Dictionary = {
+	"idle": "res://player/character/archer/Idle.fbx",
+	"walk": "res://player/character/archer/Walk.fbx",
+	"run": "res://player/character/archer/Run.fbx",
+	"jump": "res://player/character/archer/Jump.fbx",
+	"attack": "res://player/character/archer/Attack.fbx",
+	"block": "res://player/character/archer/Block.fbx",
+	"sprint": "res://player/character/archer/Sprint.fbx",
+	"spell_cast": "res://player/character/archer/Archer_Spell.fbx",
+}
+
 var camera_rotation := Vector2.ZERO  # x = yaw, y = pitch
 var _character_model: Node3D  # Container for both characters
 var _unarmed_character: Node3D
 var _armed_character: Node3D
+var _archer_character: Node3D
 var _unarmed_anim_player: AnimationPlayer
 var _armed_anim_player: AnimationPlayer
+var _archer_anim_player: AnimationPlayer
 var _current_anim_player: AnimationPlayer
 var moving: bool = false
 var is_jumping: bool = false
 var is_running: bool = false
 var _current_anim: StringName = &""
+
+# Character class state
+var character_class: CharacterClass = CharacterClass.ARCHER
 
 # Combat state
 var combat_mode: CombatMode = CombatMode.ARMED
@@ -76,6 +102,13 @@ var is_transitioning: bool = false  # For attack/idle transitions
 var is_casting: bool = false
 var attack_combo: int = 0
 var _attack_cooldown: float = 0.0
+
+# Archer bow state
+var is_drawing_bow: bool = false  # True while holding left-click to draw
+var is_holding_bow: bool = false  # True when fully drawn (0.3s) and ready to shoot
+var _bow_draw_time: float = 0.0   # How long bow has been drawn
+const BOW_DRAW_TIME_REQUIRED: float = 0.3  # Seconds to hold before arrow is ready
+var _bow_progress_bar: ProgressBar  # UI progress bar for bow draw
 
 # Damage/knockback state
 var _knockback_velocity: Vector3 = Vector3.ZERO
@@ -126,21 +159,27 @@ var _force_field_material: ShaderMaterial  # Bubble shader with noise distortion
 
 
 func _ready() -> void:
+	print("Player: _ready() starting")
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	_setup_attack_hitbox()  # Must be before _create_characters which attaches hitbox to bones
 	_create_characters()
 	_create_lightning_particles()
 	_setup_hit_label()
+	_setup_bow_progress_bar()
 	_setup_multiplayer()
 
 
 func _setup_multiplayer() -> void:
 	# Register with network manager if available
+	print("Player: _setup_multiplayer called")
 	if has_node("/root/NetworkManager"):
+		print("Player: Found NetworkManager, connecting...")
 		var network_manager = get_node("/root/NetworkManager")
 		network_manager.set_local_player(self)
 		# Auto-connect to server
 		network_manager.connect_to_server()
+	else:
+		print("Player: NetworkManager NOT found!")
 
 
 ## Returns the current player state for network synchronization
@@ -157,6 +196,11 @@ func get_network_state() -> int:
 		else:
 			return 1  # STATE_WALKING
 	return 0  # STATE_IDLE
+
+
+## Returns the current animation name for network synchronization
+func get_current_animation() -> String:
+	return str(_current_anim)
 
 
 func _create_characters() -> void:
@@ -187,7 +231,7 @@ func _create_characters() -> void:
 	_armed_character = _load_character(ARMED_CHARACTER_PATH, "ArmedCharacter", Color(0.6, 0.5, 0.3))
 	if _armed_character:
 		_character_model.add_child(_armed_character)
-		_armed_character.visible = true  # Start visible (armed mode is default)
+		_armed_character.visible = false  # Hidden by default (Archer is default class)
 		_armed_anim_player = _find_animation_player(_armed_character)
 		if _armed_anim_player:
 			_armed_anim_player.animation_finished.connect(_on_animation_finished)
@@ -195,24 +239,44 @@ func _create_characters() -> void:
 		# Setup sword hitbox bone attachment after character is loaded
 		_setup_sword_bone_attachment()
 
-	# Hide unarmed character since we start in armed mode
+	# Load archer character
+	_archer_character = _load_character(ARCHER_CHARACTER_PATH, "ArcherCharacter", Color(0.3, 0.6, 0.4))
+	if _archer_character:
+		_character_model.add_child(_archer_character)
+		_archer_character.visible = true  # Start visible (Archer is default class)
+		_archer_anim_player = _find_animation_player(_archer_character)
+		if _archer_anim_player:
+			_archer_anim_player.animation_finished.connect(_on_animation_finished)
+			_load_animations_for_character(_archer_anim_player, ARCHER_ANIM_PATHS, _get_archer_config(), "archer", _archer_character)
+		else:
+			# Create AnimationPlayer if not found
+			print("Creating AnimationPlayer for archer character")
+			_archer_anim_player = AnimationPlayer.new()
+			_archer_anim_player.name = "AnimationPlayer"
+			_archer_character.add_child(_archer_anim_player)
+			_archer_anim_player.animation_finished.connect(_on_animation_finished)
+			_load_animations_for_character(_archer_anim_player, ARCHER_ANIM_PATHS, _get_archer_config(), "archer", _archer_character)
+
+	# Hide Paladin characters since we start with Archer
 	if _unarmed_character:
 		_unarmed_character.visible = false
+	if _armed_character:
+		_armed_character.visible = false
 
-	# Set initial animation player (armed mode is default)
-	_current_anim_player = _armed_anim_player
+	# Set initial animation player (Archer is default)
+	_current_anim_player = _archer_anim_player
 
-	# Play initial idle animation (armed)
-	if _armed_anim_player and _armed_anim_player.has_animation(&"armed/Idle"):
-		_armed_anim_player.play(&"armed/Idle")
-		_current_anim = &"armed/Idle"
+	# Play initial idle animation (archer)
+	if _archer_anim_player and _archer_anim_player.has_animation(&"archer/Idle"):
+		_archer_anim_player.play(&"archer/Idle")
+		_current_anim = &"archer/Idle"
 
 	# Add unarmed hitbox to character model
 	if _character_model and _unarmed_hitbox:
 		_character_model.add_child(_unarmed_hitbox)
 		print("Player: Added unarmed hitbox to character model")
 
-	print("Characters loaded - Unarmed: ", _unarmed_character != null, ", Armed: ", _armed_character != null)
+	print("Characters loaded - Unarmed: ", _unarmed_character != null, ", Armed: ", _armed_character != null, ", Archer: ", _archer_character != null)
 
 
 func _create_lightning_particles() -> void:
@@ -881,6 +945,19 @@ func _get_armed_config() -> Dictionary:
 	}
 
 
+func _get_archer_config() -> Dictionary:
+	return {
+		"idle": ["Idle", true],
+		"walk": ["Walk", true],
+		"run": ["Run", true],
+		"jump": ["Jump", false],
+		"attack": ["Attack", false],
+		"block": ["Block", true],
+		"sprint": ["Sprint", true],
+		"spell_cast": ["SpellCast", false],
+	}
+
+
 func _load_character(path: String, name: String, fallback_color: Color) -> Node3D:
 	var scene: PackedScene = load(path) as PackedScene
 	if scene == null:
@@ -1066,6 +1143,19 @@ func _retarget_animation(anim: Animation, target_skeleton_path: String, skeleton
 
 
 func _on_animation_finished(anim_name: StringName) -> void:
+	# Reset archer bow states when attack animation finishes
+	if character_class == CharacterClass.ARCHER and anim_name == &"archer/Attack":
+		is_drawing_bow = false
+		is_holding_bow = false
+		is_attacking = false
+		_attack_cooldown = 0.0  # No cooldown - allow immediate next action
+		_bow_draw_time = 0.0
+		# Immediately transition to idle (allows walking right away)
+		if _archer_anim_player and _archer_anim_player.has_animation(&"archer/Idle"):
+			_archer_anim_player.play(&"archer/Idle")
+			_current_anim = &"archer/Idle"
+		return
+
 	if is_attacking:
 		is_attacking = false
 		disable_attack_hitbox()  # Disable hitbox when attack ends
@@ -1097,6 +1187,8 @@ func _play_anim(anim_name: StringName) -> void:
 
 
 func _get_current_mode_prefix() -> String:
+	if character_class == CharacterClass.ARCHER:
+		return "archer"
 	return "armed" if combat_mode == CombatMode.ARMED else "unarmed"
 
 
@@ -1104,7 +1196,7 @@ func _update_animation(input_dir: Vector2) -> void:
 	if _current_anim_player == null:
 		return
 
-	if is_attacking or is_sheathing or is_transitioning or is_casting:
+	if is_attacking or is_sheathing or is_transitioning or is_casting or is_drawing_bow or is_holding_bow:
 		return
 
 	var prefix: String = _get_current_mode_prefix()
@@ -1141,11 +1233,15 @@ func _update_animation(input_dir: Vector2) -> void:
 				if _current_anim_player.has_animation(walk_anim):
 					desired_anim = walk_anim
 
-	# Running
+	# Running/Sprinting (Shift key held)
 	elif is_running and input_dir.length() > 0.1:
+		# Try Run first, then Sprint, then Walk
 		var run_anim: StringName = StringName(prefix + "/Run")
+		var sprint_anim: StringName = StringName(prefix + "/Sprint")
 		if _current_anim_player.has_animation(run_anim):
 			desired_anim = run_anim
+		elif _current_anim_player.has_animation(sprint_anim):
+			desired_anim = sprint_anim
 		else:
 			var walk_anim: StringName = StringName(prefix + "/Walk")
 			if _current_anim_player.has_animation(walk_anim):
@@ -1169,6 +1265,11 @@ func _update_animation(input_dir: Vector2) -> void:
 
 func _toggle_combat_mode() -> void:
 	if is_sheathing:
+		return
+
+	# Archer class doesn't have unarmed/armed modes
+	if character_class == CharacterClass.ARCHER:
+		print("Archer class only has one combat mode")
 		return
 
 	if combat_mode == CombatMode.UNARMED:
@@ -1201,11 +1302,179 @@ func _toggle_combat_mode() -> void:
 		print("Switched to UNARMED mode (Paladin)")
 
 
+func _switch_character_class(new_class: CharacterClass) -> void:
+	if character_class == new_class:
+		return
+
+	# Hide all characters first
+	if _unarmed_character:
+		_unarmed_character.visible = false
+	if _armed_character:
+		_armed_character.visible = false
+	if _archer_character:
+		_archer_character.visible = false
+
+	character_class = new_class
+
+	match new_class:
+		CharacterClass.PALADIN:
+			# Show Paladin based on current combat mode
+			if combat_mode == CombatMode.ARMED:
+				if _armed_character:
+					_armed_character.visible = true
+				_current_anim_player = _armed_anim_player
+				if _armed_anim_player and _armed_anim_player.has_animation(&"armed/Idle"):
+					_armed_anim_player.play(&"armed/Idle")
+					_current_anim = &"armed/Idle"
+			else:
+				if _unarmed_character:
+					_unarmed_character.visible = true
+				_current_anim_player = _unarmed_anim_player
+				if _unarmed_anim_player and _unarmed_anim_player.has_animation(&"unarmed/Idle"):
+					_unarmed_anim_player.play(&"unarmed/Idle")
+					_current_anim = &"unarmed/Idle"
+			print("Switched to PALADIN class")
+
+		CharacterClass.ARCHER:
+			# Show Archer character
+			if _archer_character:
+				_archer_character.visible = true
+			_current_anim_player = _archer_anim_player
+			if _archer_anim_player and _archer_anim_player.has_animation(&"archer/Idle"):
+				_archer_anim_player.play(&"archer/Idle")
+				_current_anim = &"archer/Idle"
+			print("Switched to ARCHER class")
+
+
+func _shoot_arrow() -> void:
+	# Create arrow instance
+	var arrow = ArrowScene.instantiate()
+	arrow.shooter = self
+
+	# Get camera direction for aiming
+	var camera = _camera_pivot.get_node("Camera3D") as Camera3D
+	var spawn_pos = global_position + Vector3(0, 1.5, 0)  # Spawn at chest height
+
+	# Calculate direction from camera
+	var forward = -camera.global_transform.basis.z
+	var aim_direction = forward.normalized()
+
+	# Add some upward arc for parabolic trajectory
+	aim_direction.y += 0.15
+
+	# Add arrow to scene
+	get_tree().current_scene.add_child(arrow)
+	arrow.global_position = spawn_pos
+	arrow.launch(aim_direction)
+
+
+func _start_bow_draw() -> void:
+	# Start drawing the bow (on left-click press)
+	if is_drawing_bow or is_holding_bow or is_attacking or _attack_cooldown > 0:
+		return
+
+	is_drawing_bow = true
+	is_holding_bow = false
+	_bow_draw_time = 0.0
+
+	# Show progress bar
+	if _bow_progress_bar:
+		_bow_progress_bar.value = 0.0
+		_bow_progress_bar.visible = true
+		var ready_label = _bow_progress_bar.get_parent().get_node_or_null("ReadyLabel")
+		if ready_label:
+			ready_label.text = ""
+
+	# Play draw animation from the beginning
+	if _archer_anim_player and _archer_anim_player.has_animation(&"archer/Attack"):
+		_archer_anim_player.play(&"archer/Attack")
+		_current_anim = &"archer/Attack"
+
+
+func _update_bow_draw(delta: float) -> void:
+	# Update bow draw progress based on time
+	if not is_drawing_bow:
+		# Hide progress bar when not drawing
+		if _bow_progress_bar and _bow_progress_bar.visible and not is_holding_bow:
+			_bow_progress_bar.visible = false
+		return
+
+	if is_holding_bow:
+		return
+
+	# Increment draw time
+	_bow_draw_time += delta
+
+	# Update progress bar
+	var progress: float = clampf(_bow_draw_time / BOW_DRAW_TIME_REQUIRED, 0.0, 1.0)
+	if _bow_progress_bar:
+		_bow_progress_bar.value = progress
+
+		# Update ready label and bar color when complete
+		var ready_label = _bow_progress_bar.get_parent().get_node_or_null("ReadyLabel")
+		if progress >= 1.0:
+			if ready_label:
+				ready_label.text = "READY!"
+			# Change bar to green when ready
+			var style_fill = _bow_progress_bar.get_theme_stylebox("fill") as StyleBoxFlat
+			if style_fill:
+				style_fill.bg_color = Color(0.2, 1.0, 0.3)  # Green
+
+	# Check if draw time reached
+	if _bow_draw_time >= BOW_DRAW_TIME_REQUIRED:
+		is_drawing_bow = false
+		is_holding_bow = true
+		# Pause animation at current position
+		if _archer_anim_player:
+			_archer_anim_player.pause()
+
+
+func _release_bow() -> void:
+	# Release the arrow (on left-click release)
+	if not is_drawing_bow and not is_holding_bow:
+		return
+
+	# Hide progress bar
+	if _bow_progress_bar:
+		_bow_progress_bar.visible = false
+		# Reset bar color to orange
+		var style_fill = _bow_progress_bar.get_theme_stylebox("fill") as StyleBoxFlat
+		if style_fill:
+			style_fill.bg_color = Color(1.0, 0.6, 0.2)  # Orange
+		var ready_label = _bow_progress_bar.get_parent().get_node_or_null("ReadyLabel")
+		if ready_label:
+			ready_label.text = ""
+
+	# If still drawing (released early before 0.3s), just cancel
+	if is_drawing_bow and not is_holding_bow:
+		is_drawing_bow = false
+		_bow_draw_time = 0.0
+		# Return to idle
+		if _archer_anim_player and _archer_anim_player.has_animation(&"archer/Idle"):
+			_archer_anim_player.play(&"archer/Idle")
+			_current_anim = &"archer/Idle"
+		return
+
+	# Arrow is ready - shoot it
+	is_holding_bow = false
+	_bow_draw_time = 0.0
+
+	# Shoot the arrow
+	_shoot_arrow()
+
+	# Quick transition back to idle for responsiveness
+	if _archer_anim_player and _archer_anim_player.has_animation(&"archer/Idle"):
+		_archer_anim_player.play(&"archer/Idle")
+		_current_anim = &"archer/Idle"
+
+
 func _do_attack() -> void:
 	if is_attacking or _attack_cooldown > 0:
 		return
 
 	is_attacking = true
+
+	# Paladin class uses melee attacks
 	enable_attack_hitbox()  # Enable hitbox when attack starts
 
 	if combat_mode == CombatMode.ARMED:
@@ -1236,10 +1505,13 @@ func _do_attack() -> void:
 
 
 func _do_spell_cast() -> void:
-	# Only allow spell cast in armed mode
-	if combat_mode != CombatMode.ARMED:
+	# Allow spell cast in armed mode (Paladin) or for Archer class
+	if character_class == CharacterClass.PALADIN and combat_mode != CombatMode.ARMED:
 		return
 	if is_casting or is_attacking or _attack_cooldown > 0:
+		return
+	# Archer cannot cast while drawing/holding bow
+	if is_drawing_bow or is_holding_bow:
 		return
 
 	is_casting = true
@@ -1247,13 +1519,20 @@ func _do_spell_cast() -> void:
 	# Start all spell effects
 	_start_spell_effects()
 
-	# Play spell cast animation
-	if _current_anim_player.has_animation(&"armed/SpellCast"):
-		_current_anim_player.play(&"armed/SpellCast")
-		_current_anim = &"armed/SpellCast"
+	# Play spell cast animation based on character class
+	var spell_anim: StringName
+	if character_class == CharacterClass.ARCHER:
+		spell_anim = &"archer/SpellCast"
+	else:
+		spell_anim = &"armed/SpellCast"
+
+	if _current_anim_player.has_animation(spell_anim):
+		_current_anim_player.play(spell_anim)
+		_current_anim = spell_anim
 	else:
 		is_casting = false
 		_stop_spell_effects()
+		print("SpellCast animation not found: ", spell_anim)
 
 
 ## Combat - Take damage and knockback from enemy attacks
@@ -1342,6 +1621,66 @@ func _setup_hit_label() -> void:
 	_hit_label.position = Vector3(0, 2.5, 0)  # Above head
 	_hit_label.visible = false
 	add_child(_hit_label)
+
+
+func _setup_bow_progress_bar() -> void:
+	# Create CanvasLayer for HUD elements
+	var canvas = CanvasLayer.new()
+	canvas.name = "BowHUD"
+	add_child(canvas)
+
+	# Create container centered at bottom of screen
+	var container = CenterContainer.new()
+	container.name = "ProgressContainer"
+	container.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	container.offset_top = -100
+	container.offset_bottom = -60
+	container.offset_left = -100
+	container.offset_right = 100
+	canvas.add_child(container)
+
+	# Create VBox for progress bar and label
+	var vbox = VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	container.add_child(vbox)
+
+	# Create progress bar
+	_bow_progress_bar = ProgressBar.new()
+	_bow_progress_bar.name = "BowProgressBar"
+	_bow_progress_bar.custom_minimum_size = Vector2(200, 20)
+	_bow_progress_bar.min_value = 0.0
+	_bow_progress_bar.max_value = 1.0
+	_bow_progress_bar.value = 0.0
+	_bow_progress_bar.show_percentage = false
+	_bow_progress_bar.visible = false
+
+	# Style the progress bar
+	var style_bg = StyleBoxFlat.new()
+	style_bg.bg_color = Color(0.1, 0.1, 0.1, 0.8)
+	style_bg.corner_radius_top_left = 4
+	style_bg.corner_radius_top_right = 4
+	style_bg.corner_radius_bottom_left = 4
+	style_bg.corner_radius_bottom_right = 4
+	_bow_progress_bar.add_theme_stylebox_override("background", style_bg)
+
+	var style_fill = StyleBoxFlat.new()
+	style_fill.bg_color = Color(1.0, 0.6, 0.2)  # Orange like fire arrow
+	style_fill.corner_radius_top_left = 4
+	style_fill.corner_radius_top_right = 4
+	style_fill.corner_radius_bottom_left = 4
+	style_fill.corner_radius_bottom_right = 4
+	_bow_progress_bar.add_theme_stylebox_override("fill", style_fill)
+
+	vbox.add_child(_bow_progress_bar)
+
+	# Add "Ready!" label below progress bar
+	var ready_label = Label.new()
+	ready_label.name = "ReadyLabel"
+	ready_label.text = ""
+	ready_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ready_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.2))
+	ready_label.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(ready_label)
 
 
 func _setup_attack_hitbox() -> void:
@@ -1485,6 +1824,9 @@ func disable_attack_hitbox() -> void:
 
 func _update_attack_hitbox_timing() -> void:
 	# Track attack animation progress and enable hitbox only during middle-to-end
+	# Skip for Archer class - they use projectiles, not melee hitboxes
+	if character_class == CharacterClass.ARCHER:
+		return
 	if not is_attacking or _current_anim_player == null:
 		return
 
@@ -1560,13 +1902,34 @@ func _input(event: InputEvent) -> void:
 		_toggle_combat_mode()
 
 	# Attack with left mouse button, F key, or gamepad X button
-	if event.is_action_pressed(&"attack"):
-		_do_attack()
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+	# Archer: press to draw bow, release to shoot
+	# Others: press to attack
+	if character_class == CharacterClass.ARCHER:
+		# Archer bow mechanics: hold to draw, release to shoot
+		if event.is_action_pressed(&"attack"):
+			_start_bow_draw()
+		elif event.is_action_released(&"attack"):
+			_release_bow()
+		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+				if event.pressed:
+					_start_bow_draw()
+				else:
+					_release_bow()
+		elif event is InputEventKey and event.keycode == KEY_F:
+			if event.pressed:
+				_start_bow_draw()
+			else:
+				_release_bow()
+	else:
+		# Paladin: attack on press
+		if event.is_action_pressed(&"attack"):
 			_do_attack()
-	elif event is InputEventKey and event.pressed and event.keycode == KEY_F:
-		_do_attack()
+		elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+				_do_attack()
+		elif event is InputEventKey and event.pressed and event.keycode == KEY_F:
+			_do_attack()
 
 	# Block with right mouse button or gamepad LB
 	if event.is_action_pressed(&"block"):
@@ -1580,6 +1943,13 @@ func _input(event: InputEvent) -> void:
 	# Spell cast with C key, gamepad B button, or RB (armed mode only)
 	if event.is_action_pressed(&"spell_cast") or event.is_action_pressed(&"cast_spell_rb"):
 		_do_spell_cast()
+
+	# Switch character class: 4 (Archer), 5 (Paladin) - Archer is default
+	if event is InputEventKey and event.pressed:
+		if event.keycode == KEY_4:
+			_switch_character_class(CharacterClass.ARCHER)
+		elif event.keycode == KEY_5:
+			_switch_character_class(CharacterClass.PALADIN)
 
 	# Mouse look
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
@@ -1603,6 +1973,9 @@ func _physics_process(delta: float) -> void:
 
 	# Update sword hitbox timing based on attack animation progress
 	_update_attack_hitbox_timing()
+
+	# Update bow draw state (time-based progress)
+	_update_bow_draw(delta)
 
 	# Handle stun/knockback state
 	if _is_stunned:
@@ -1649,11 +2022,17 @@ func _physics_process(delta: float) -> void:
 
 	# Get movement input with analog stick support
 	var input_dir := Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back", 0.15)
-	var input_strength := input_dir.length()  # 0.0 to 1.0 for analog stick intensity
 
-	# Determine run state: Shift key OR stick pushed >60%
+	# Determine run state: Shift key for keyboard, stick intensity > 60% for gamepad only
 	var keyboard_run := Input.is_action_pressed(&"run") if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED else false
-	is_running = keyboard_run or input_strength > RUN_THRESHOLD
+	# Check if using gamepad (joy axis) vs keyboard (digital input)
+	var joy_input := Vector2(
+		Input.get_joy_axis(0, JOY_AXIS_LEFT_X),
+		Input.get_joy_axis(0, JOY_AXIS_LEFT_Y)
+	)
+	var using_gamepad := joy_input.length() > 0.1
+	var gamepad_run := using_gamepad and joy_input.length() > RUN_THRESHOLD
+	is_running = keyboard_run or gamepad_run
 
 	var current_max_speed: float = RUN_SPEED if is_running else WALK_SPEED
 	var horizontal_velocity := Vector3(velocity.x, 0, velocity.z)
